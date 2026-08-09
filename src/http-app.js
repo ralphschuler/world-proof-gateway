@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const idkitAssetDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "node_modules", "@worldcoin", "idkit-core", "dist");
+const browserAssetDirectory = join(dirname(fileURLToPath(import.meta.url)), "static");
 const idkitAssets = {
   "/assets/idkit.global.js": { file: "idkit.global.js", type: "text/javascript; charset=utf-8" },
   "/assets/idkit_wasm_bg.wasm": { file: "idkit_wasm_bg.wasm", type: "application/wasm" },
@@ -20,6 +21,10 @@ function html(res, content) { res.writeHead(200, { "content-type": "text/html; c
 function asset(res, definition) {
   res.writeHead(200, { "content-type": definition.type, "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" });
   createReadStream(join(idkitAssetDirectory, definition.file)).on("error", () => { if (!res.headersSent) res.writeHead(404); res.end(); }).pipe(res);
+}
+function browserAsset(res, file) {
+  res.writeHead(200, { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" });
+  createReadStream(join(browserAssetDirectory, file)).on("error", () => { if (!res.headersSent) res.writeHead(404); res.end(); }).pipe(res);
 }
 async function body(req) {
   let raw = ""; for await (const chunk of req) { raw += chunk; if (raw.length > 100_000) throw new Error("body_too_large"); }
@@ -47,6 +52,7 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
   return async (req, res) => {
     const origin = req.headers.origin;
     if (req.method === "GET" && idkitAssets[req.url]) return asset(res, idkitAssets[req.url]);
+    if (req.method === "GET" && req.url === "/assets/minikit.js") return browserAsset(res, "minikit.js");
     // The World Developer Portal opens the registered app URL at its origin.
     // Production therefore needs the owner console at `/`, not a separate
     // marketing/checkout page that assumes a project already exists.

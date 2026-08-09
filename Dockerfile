@@ -1,9 +1,18 @@
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY --chown=node:node src ./src
+COPY --chown=node:node scripts ./scripts
+RUN node scripts/build-browser.mjs
+
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node src ./src
+COPY --from=build --chown=node:node /app/src/static ./src/static
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node db ./db
 COPY --chown=node:node config ./config

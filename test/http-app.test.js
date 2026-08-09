@@ -26,6 +26,9 @@ test("demo mode serves labeled onboarding and a healthy non-verifying path", asy
     const wasm = await fetch(`${base}/assets/idkit_wasm_bg.wasm`);
     assert.equal(wasm.status, 200);
     assert.match(wasm.headers.get("content-type"), /application\/wasm/);
+    const minikit = await fetch(`${base}/assets/minikit.js`);
+    assert.equal(minikit.status, 200);
+    assert.match(minikit.headers.get("content-type"), /text\/javascript/);
     const health = await (await fetch(`${base}/healthz`)).json();
     assert.deepEqual(health, { ok: true, mode: "demo" });
     const blocked = await (await fetch(`${base}/v1/projects/demo/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();

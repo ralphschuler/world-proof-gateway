@@ -3,16 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "migrate": "node scripts/migrate.js",
-    "test": "node --test",
+    "test": "node scripts/build-browser.mjs && node --test",
     "check": "node --check src/*.js"
   },
   "dependencies": {
     "@worldcoin/idkit-core": "^4.2.3",
+    "@worldcoin/minikit-js": "^2.0.3",
     "pg": "^8.16.3",
     "viem": "^2.55.11"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.7"
   }
 }
