@@ -1,6 +1,6 @@
 -- Required production schema. Use PostgreSQL: NUMERIC(78,0) preserves World ID
 -- nullifiers exactly; a bigint or JavaScript Number does not.
-CREATE TABLE proof_contexts (
+CREATE TABLE IF NOT EXISTS proof_contexts (
   nonce TEXT PRIMARY KEY,
   project_id TEXT NOT NULL,
   action TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE proof_contexts (
   consumed_at TIMESTAMPTZ
 );
 
-CREATE TABLE verified_nullifiers (
+CREATE TABLE IF NOT EXISTS verified_nullifiers (
   project_id TEXT NOT NULL,
   action TEXT NOT NULL,
   nullifier NUMERIC(78,0) NOT NULL,

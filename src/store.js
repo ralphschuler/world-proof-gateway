@@ -18,4 +18,5 @@ export class MemoryProofStore {
     this.#nullifiers.add(key);
     return true;
   }
+  async health() { return true; }
 }

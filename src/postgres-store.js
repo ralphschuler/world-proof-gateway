@@ -28,4 +28,5 @@ export class PostgresProofStore {
     return result.rowCount === 1;
   }
   async close() { await this.#pool.end(); }
+  async health() { await this.#pool.query("SELECT 1"); return true; }
 }

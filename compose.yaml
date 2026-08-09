@@ -1,0 +1,36 @@
+services:
+  gateway:
+    build: .
+    command: sh -c "npm run migrate && npm start"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATABASE_URL: postgres://gateway:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/world_proof_gateway
+      PROJECTS_CONFIG_PATH: /app/config/projects.json
+      GATEWAY_ATTESTATION_KEY: ${GATEWAY_ATTESTATION_KEY:?set GATEWAY_ATTESTATION_KEY}
+      IDLEMINT_RP_SIGNING_KEY: ${IDLEMINT_RP_SIGNING_KEY:?set IDLEMINT_RP_SIGNING_KEY}
+    volumes:
+      - ./config/projects.json:/app/config/projects.json:ro
+    ports:
+      - "127.0.0.1:8787:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: world_proof_gateway
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d world_proof_gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  postgres_data:

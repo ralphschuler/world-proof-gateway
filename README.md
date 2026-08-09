@@ -1,6 +1,6 @@
 # World Proof Gateway
 
-Reusable **trusted backend boundary** for World-ID-enabled, mostly-static Mini Apps. It lets a static frontend request an RP context and submit an IDKit proof without ever receiving an RP signing key. It is deliberately a service, not a client-side workaround.
+Deployable, multi-tenant **trusted backend boundary** for World-ID-enabled, mostly-static Mini Apps. It lets a static frontend request an RP context and submit an IDKit proof without ever receiving an RP signing key. It is deliberately a service, not a client-side workaround.
 
 ## What this unlocks
 
@@ -25,6 +25,15 @@ npm start
 ```
 
 `MemoryProofStore` is for tests/dev only. Set `DATABASE_URL` and run `db/schema.sql` before production start; `PostgresProofStore` uses atomic updates/inserts for context and nullifier replay prevention. Production start fails without `DATABASE_URL`.
+
+## Deploy
+
+1. Copy `config/projects.example.json` to private `config/projects.json` and register each tenant's exact World app, RP, action and allowed origin.
+2. Put `POSTGRES_PASSWORD`, each tenant RP signing key, and (only for on-chain attestation tenants) `GATEWAY_ATTESTATION_KEY` in a secrets manager or deployment environment.
+3. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
+4. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
+
+The public client contract is in [docs/API.md](docs/API.md); the current private-beta SaaS model is in [docs/SAAS.md](docs/SAAS.md).
 
 ## Deployment guardrails
 
