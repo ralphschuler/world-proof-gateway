@@ -15,7 +15,7 @@ The gateway signs the context server-side, sends the untouched proof to World, a
 
 ## Owner dashboard MVP
 
-`/dashboard` authenticates a Gateway owner with the Gateway's configured World App/RP (`GATEWAY_OWNER_APP_ID`, `GATEWAY_OWNER_RP_ID`, `RP_SIGNING_KEY`). Owner login is closed by default: a valid World ID proof receives a session only when its nullifier was previously enrolled. An operator must explicitly bootstrap an owner through `POST /v1/admin/owner/proof-context` and `POST /v1/admin/owner/proofs`, each with `Authorization: Bearer $GATEWAY_ADMIN_TOKEN`; bootstrap enrollment is one-time. The server signs the owner RP context, directly verifies the untouched proof with World, persists enrollment in PostgreSQL, and issues an eight-hour `HttpOnly; Secure; SameSite=Lax` session cookie signed with `GATEWAY_SESSION_SECRET`. Owner login contexts are separate from tenant proof contexts and never consume request credits.
+`/dashboard` authenticates a Gateway owner with the Gateway's configured World App/RP (`GATEWAY_OWNER_APP_ID`, `GATEWAY_OWNER_RP_ID`, `RP_SIGNING_KEY`). Owner enrollment is server-only: put the allowed, comma-separated scoped World ID nullifiers in `GATEWAY_OWNER_NULLIFIERS` (decimal or `0x` notation). At startup the Gateway normalizes and stores those values; there is no browser bootstrap flow or owner-enrollment API. A valid World ID proof receives a session only when its verified nullifier is currently listed in that environment value; removing a value revokes new sessions after restart. The nullifier is neither a wallet address nor a private key. The server signs the owner RP context, directly verifies the untouched proof with World, and issues an eight-hour `HttpOnly; Secure; SameSite=Lax` session cookie signed with `GATEWAY_SESSION_SECRET`. Owner login contexts are separate from tenant proof contexts and never consume request credits.
 
 An authenticated owner can create and list only their own projects. The owner must create the App, RP and action in the World Developer Portal and enter that Portal-issued RP signing key once in the HTTPS dashboard. The Gateway does not generate tenant signing keys: it encrypts the submitted key envelope at rest and never returns, lists or displays the key. Portal configuration is a manual prerequisite because no documented runtime API can register a Gateway-generated key.
 
@@ -27,6 +27,7 @@ For Mini Apps whose gameplay is fully on-chain, the gateway issues a short-lived
 # Put keys only in process secret environment. `RP_SIGNING_KEY` belongs to the
 # Gateway's own World RP; individual tenant keys are encrypted in PostgreSQL.
 export RP_SIGNING_KEY=0x...
+export GATEWAY_OWNER_NULLIFIERS=0x...,123...
 export GATEWAY_TENANT_ENCRYPTION_KEY=replace-with-32-byte-base64url-or-64-hex-key
 export GATEWAY_ADMIN_TOKEN=replace-with-long-random-token
 npm install
@@ -62,8 +63,9 @@ Demo mode identifies itself in both `/` and `/healthz`. Its health check succeed
 
 1. Copy `config/projects.example.json` to private `config/projects.json` and register each tenant's exact World app, RP, action and allowed origin.
 2. Put `POSTGRES_PASSWORD`, each tenant RP signing key, and (only for on-chain attestation tenants) `GATEWAY_ATTESTATION_KEY` in a secrets manager or deployment environment.
-3. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
-4. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
+3. Set `GATEWAY_OWNER_NULLIFIERS` to the scoped World ID nullifiers which may own the Gateway; it is not a wallet/private key list.
+4. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
+5. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
 
 ### Tenant provisioning
 

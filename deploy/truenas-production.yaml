@@ -17,6 +17,8 @@ services:
       GATEWAY_OWNER_APP_ID: REPLACE_GATEWAY_OWNER_APP_ID
       GATEWAY_OWNER_RP_ID: REPLACE_GATEWAY_OWNER_RP_ID
       GATEWAY_OWNER_ENVIRONMENT: production
+      # Comma-separated decimal or 0x World ID owner nullifiers; never wallet keys.
+      GATEWAY_OWNER_NULLIFIERS: REPLACE_GATEWAY_OWNER_NULLIFIERS
       GATEWAY_SESSION_SECRET: REPLACE_RANDOM_SESSION_SECRET
       # 1 WLD / 5,000 requests. Both receiver and Developer Portal API key stay server-side.
       WLD_RECEIVER_ADDRESS: REPLACE_WLD_RECEIVER_ADDRESS

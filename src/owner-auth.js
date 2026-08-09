@@ -4,8 +4,25 @@ import { signRequest } from "@worldcoin/idkit-core/signing";
 function json(status, body) { return { status, body }; }
 function hex(value) { try { return BigInt(value).toString(10); } catch { return null; } }
 
-export function createOwnerAuth({ store, appId, rpId, signingKey, environment = "production", action = "gateway-owner-login-v1", sessionSecret, fetchImpl = globalThis.fetch, now = () => Date.now() }) {
+export function configuredOwnerNullifiers(value) {
+  if (!value) return [];
+  const nullifiers = new Set();
+  for (const item of String(value).split(",")) {
+    const nullifier = hex(item.trim());
+    if (!nullifier || BigInt(nullifier) <= 0n) throw new Error("invalid_gateway_owner_nullifier");
+    nullifiers.add(nullifier);
+  }
+  return [...nullifiers];
+}
+
+export async function enrollConfiguredOwners(store, value) {
+  const nullifiers = Array.isArray(value) ? value : configuredOwnerNullifiers(value);
+  for (const nullifier of nullifiers) await store.enrollOwnerNullifier(nullifier);
+}
+
+export function createOwnerAuth({ store, appId, rpId, signingKey, environment = "production", action = "gateway-owner-login-v1", sessionSecret, ownerNullifiers = [], fetchImpl = globalThis.fetch, now = () => Date.now() }) {
   if (!store || !/^app_[A-Za-z0-9]+$/.test(appId || "") || !/^rp_[A-Za-z0-9]+$/.test(rpId || "") || !signingKey || !sessionSecret) throw new Error("owner_auth_configuration_required");
+  const configuredOwners = new Set(ownerNullifiers);
   const mac = (value) => createHmac("sha256", sessionSecret).update(value).digest("base64url");
   const encode = (owner) => {
     const payload = Buffer.from(JSON.stringify({ owner, exp: Math.floor(now() / 1000) + 60 * 60 * 8 })).toString("base64url");
@@ -21,7 +38,7 @@ export function createOwnerAuth({ store, appId, rpId, signingKey, environment = 
     await store.saveOwnerContext({ nonce: request.nonce, action, expiresAt: Number(request.expiresAt) * 1000 });
     return json(200, { app_id: appId, action, environment, rp_context: { rp_id: rpId, nonce: request.nonce, created_at: request.createdAt, expires_at: request.expiresAt, signature: request.sig } });
   }
-  async function verify({ idkitResponse, bootstrap = false } = {}) {
+  async function verify({ idkitResponse } = {}) {
     if (!idkitResponse || typeof idkitResponse.nonce !== "string" || idkitResponse.action !== action || idkitResponse.environment !== environment) return json(400, { error: "invalid_proof_shape" });
     const context = await store.consumeOwnerContext(idkitResponse.nonce);
     if (!context || context.action !== action) return json(409, { error: "expired_or_replayed_context" });
@@ -29,12 +46,8 @@ export function createOwnerAuth({ store, appId, rpId, signingKey, environment = 
     let verified; try { verified = await response.json(); } catch { return json(502, { error: "world_verify_invalid_response" }); }
     const nullifier = hex(verified?.nullifier);
     if (!response.ok || verified?.success !== true || verified.action !== action || verified.environment !== environment || !nullifier) return json(422, { error: "world_proof_rejected" });
-    if (bootstrap) {
-      if (!(await store.enrollOwnerNullifier(nullifier))) return json(409, { error: "owner_already_enrolled" });
-    } else {
-      if (!(await store.isOwnerEnrolled(nullifier))) return json(403, { error: "owner_not_enrolled" });
-      await store.recordOwnerLogin(nullifier);
-    }
+    if (!configuredOwners.has(nullifier) || !(await store.isOwnerEnrolled(nullifier))) return json(403, { error: "owner_not_enrolled" });
+    await store.recordOwnerLogin(nullifier);
     return json(200, { verified: true, session: encode(nullifier) });
   }
   return { proofContext, verify, session };

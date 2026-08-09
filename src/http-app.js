@@ -98,18 +98,6 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
       if (demoMode || !ownerAuth) return reply(res, 503, { error: "owner_auth_unavailable" });
       try { const result = await ownerAuth.verify(await body(req)); if (result.status !== 200) return reply(res, result.status, result.body); res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "set-cookie": ownerCookie(result.body.session) }); return res.end(JSON.stringify({ verified: true })); } catch { return reply(res, 400, { error: "invalid_json" }); }
     }
-    if (req.url === "/v1/admin/owner/proof-context" || req.url === "/v1/admin/owner/proofs") {
-      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
-      if (demoMode || !ownerAuth) return reply(res, 503, { error: "owner_auth_unavailable" });
-      if (!authorized(req, adminToken)) return reply(res, 401, { error: "unauthorized" });
-      try {
-        const result = req.url.endsWith("proof-context") ? await ownerAuth.proofContext() : await ownerAuth.verify({ ...(await body(req)), bootstrap: true });
-        if (result.status !== 200) return reply(res, result.status, result.body);
-        if (req.url.endsWith("proof-context")) return reply(res, result.status, result.body);
-        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "set-cookie": ownerCookie(result.body.session) });
-        return res.end(JSON.stringify({ verified: true, enrolled: true }));
-      } catch { return reply(res, 400, { error: "invalid_json" }); }
-    }
     if (req.url === "/v1/owner/projects") {
       if (!ownerAuth || !tenantRegistry) return reply(res, 503, { error: "owner_dashboard_unavailable" });
       const owner = ownerAuth.session(cookie(req, "wpg_owner_session"));
