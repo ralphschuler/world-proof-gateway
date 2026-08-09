@@ -26,12 +26,32 @@ npm start
 
 `MemoryProofStore` is for tests/dev only. Set `DATABASE_URL` and run `db/schema.sql` before production start; `PostgresProofStore` uses atomic updates/inserts for context and nullifier replay prevention. Production start fails without `DATABASE_URL`.
 
+## Private-beta onboarding and demo mode
+
+`GET /` serves a minimal browser onboarding page. It explains World ID, separate wallet authentication, WLD billing readiness, a deliberately non-functional unique setup-link placeholder, and a support form. Ordinary browser visitors can safely use this page; it never requests a proof, connects a wallet, or starts a payment.
+
+`GET /v1/billing/plan` is a read-only configuration view. It explicitly reports that WLD billing is not ready and that charging, prices, receivers, payment collection, MiniKit Pay, and token transfers are absent.
+
+`POST /v1/support-requests` accepts only an email and a short message. With the in-memory test/demo store it is explicitly non-production and is lost on restart. With PostgreSQL it returns `503` until a reviewed durable support schema is added; do not use it for production support intake yet.
+
+For a deployment smoke test without any World secrets, project config, or database, set `DEMO_MODE=true`:
+
+```bash
+DEMO_MODE=true NODE_ENV=production npm start
+```
+
+Or use the self-contained reviewer profile: `docker compose -f compose.demo.yaml up --build`.
+
+Demo mode identifies itself in both `/` and `/healthz`. Its health check succeeds using the in-memory test layer, but every proof-context and proof-verification endpoint returns `503 demo_mode_real_proofs_disabled`; it does not contact World and cannot verify or credit real proofs. Do not set `DEMO_MODE` for a real deployment. Outside demo mode, production startup fails closed without `DATABASE_URL`, and project loading fails without the configured signing-key environment variables.
+
 ## Deploy
 
 1. Copy `config/projects.example.json` to private `config/projects.json` and register each tenant's exact World app, RP, action and allowed origin.
 2. Put `POSTGRES_PASSWORD`, each tenant RP signing key, and (only for on-chain attestation tenants) `GATEWAY_ATTESTATION_KEY` in a secrets manager or deployment environment.
 3. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
 4. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
+
+For a Custom App review/demo deployment, use the same container with `DEMO_MODE=true` and omit real World/database configuration. The page must remain visibly marked DEMO. This mode is only suitable for health checks and onboarding review, never for proof verification or asset crediting.
 
 The public client contract is in [docs/API.md](docs/API.md); the current private-beta SaaS model is in [docs/SAAS.md](docs/SAAS.md).
 

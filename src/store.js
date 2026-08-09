@@ -4,6 +4,7 @@
 export class MemoryProofStore {
   #contexts = new Map();
   #nullifiers = new Set();
+  #supportRequests = [];
 
   async saveContext(context) { this.#contexts.set(context.nonce, context); }
   async consumeContext(nonce) {
@@ -19,4 +20,7 @@ export class MemoryProofStore {
     return true;
   }
   async health() { return true; }
+  // Explicitly non-production: this is intentionally lost on restart.
+  async saveSupportRequest(request) { this.#supportRequests.push(request); }
+  async listSupportRequests() { return [...this.#supportRequests]; }
 }

@@ -12,6 +12,7 @@ function required(value, name) {
 
 export function validateProjects(value, env = process.env) {
   if (!value || !Array.isArray(value.projects)) throw new Error("projects_array_required");
+  if (value.projects.length === 0) throw new Error("at_least_one_project_required");
   const projects = new Map();
   for (const project of value.projects) {
     if (!project || !/^[a-z0-9-]{3,48}$/.test(project.id || "")) throw new Error("invalid_project_id");

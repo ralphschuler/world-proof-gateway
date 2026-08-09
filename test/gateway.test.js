@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import { createGateway } from "../src/gateway.js";
 import { MemoryProofStore } from "../src/store.js";
 import { hashSignal } from "@worldcoin/idkit-core/hashing";
+import { validateProjects } from "../src/config.js";
 
 const key = `0x${"11".repeat(32)}`;
 const projects = new Map([["demo", { id: "demo", appId: "app_demo", rpId: "rp_demo", action: "demo-access-v1", environment: "staging", signingKey: key, allowedOrigins: ["https://example.test"], signalPolicy: "none" }]]);
+test("real configuration fails closed when it contains no project secrets", () => {
+  assert.throws(() => validateProjects({ projects: [] }, {}), /at_least_one_project_required/);
+});
 test("fixed project config creates a signed RP context", async () => {
   const gateway = createGateway({ projects, store: new MemoryProofStore(), fetchImpl: fetch });
   const result = await gateway.proofContext("demo", { action: "demo-access-v1" }, "https://example.test");

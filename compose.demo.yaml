@@ -1,0 +1,13 @@
+# Safe Custom App/reviewer smoke-test profile. It deliberately has no World
+# credentials, database, billing settings, or public proof-verification path.
+services:
+  gateway-demo:
+    build: .
+    environment:
+      DEMO_MODE: "true"
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8787
+    ports:
+      - "127.0.0.1:8787:8787"
+    restart: unless-stopped

@@ -2,6 +2,22 @@
 
 Base URL: `https://proof.example.com`. Each static Mini App owns a fixed project ID, configured by the SaaS operator after World Developer Portal registration.
 
+## Private-beta browser and configuration endpoints
+
+`GET /` is a harmless static onboarding page for regular browsers. It contains no IDKit request, wallet connection, payment form, price, receiver, or setup activation. The displayed setup URL is a placeholder that the operator must replace with a tenant-specific private link after approval.
+
+`GET /v1/billing/plan` returns the non-charging beta configuration:
+
+```json
+{ "mode": "configuration_only", "charging_enabled": false, "wld_billing_ready": false }
+```
+
+No billing endpoint can charge WLD or any other token. There is no MiniKit Pay integration.
+
+`POST /v1/support-requests` accepts `{ "email": "...", "message": "..." }`. It is only persisted by the test/demo `MemoryProofStore`, where it is non-durable and erased on restart. A PostgreSQL-backed production service returns `503` for this endpoint until a durable support schema is explicitly reviewed and implemented.
+
+When `DEMO_MODE=true`, `/healthz` returns `{ "ok": true, "mode": "demo" }`; all project proof endpoints return `503` with `demo_mode_real_proofs_disabled`, without contacting World or crediting anything.
+
 ## Request a proof context
 
 `POST /v1/projects/{projectId}/proof-context`
