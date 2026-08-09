@@ -1,0 +1,19 @@
+{
+  "projects": [
+    {
+      "id": "idlemint",
+      "appId": "app_replace_me",
+      "rpId": "rp_replace_me",
+      "action": "idlemint-game-access-v1",
+      "environment": "production",
+      "signingKeyEnv": "IDLEMINT_RP_SIGNING_KEY",
+      "allowedOrigins": ["https://nyphon.de"],
+      "signalPolicy": "wallet-address",
+      "attestation": {
+        "chainId": 480,
+        "verifyingContract": "0x0000000000000000000000000000000000000000",
+        "ttlSeconds": 300
+      }
+    }
+  ]
+}
