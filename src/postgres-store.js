@@ -58,6 +58,25 @@ export class PostgresProofStore {
   async restoreProjectRequestCredit(projectId) {
     await this.#pool.query("UPDATE project_request_credits SET remaining_requests = remaining_requests + 1, updated_at = NOW() WHERE project_id = $1", [projectId]);
   }
+  async saveOwnerContext(context) {
+    await this.#pool.query("INSERT INTO owner_proof_contexts (nonce, action, expires_at) VALUES ($1,$2,to_timestamp($3 / 1000.0))", [context.nonce, context.action, context.expiresAt]);
+  }
+  async consumeOwnerContext(nonce) {
+    const result = await this.#pool.query("UPDATE owner_proof_contexts SET consumed_at = NOW() WHERE nonce = $1 AND consumed_at IS NULL AND expires_at > NOW() RETURNING nonce, action", [nonce]);
+    return result.rowCount ? { nonce: result.rows[0].nonce, action: result.rows[0].action, consumed: true } : null;
+  }
+  async isOwnerEnrolled(nullifier) {
+    const result = await this.#pool.query("SELECT 1 FROM owner_nullifiers WHERE nullifier = $1", [nullifier]);
+    return result.rowCount === 1;
+  }
+  async enrollOwnerNullifier(nullifier) {
+    const result = await this.#pool.query("INSERT INTO owner_nullifiers (nullifier, enrolled_at, last_login_at) VALUES ($1, NOW(), NOW()) ON CONFLICT DO NOTHING RETURNING nullifier", [nullifier]);
+    return result.rowCount === 1;
+  }
+  async recordOwnerLogin(nullifier) {
+    const result = await this.#pool.query("UPDATE owner_nullifiers SET last_login_at = NOW() WHERE nullifier = $1 RETURNING nullifier", [nullifier]);
+    return result.rowCount === 1;
+  }
   async close() { await this.#pool.end(); }
   async health() { await this.#pool.query("SELECT 1"); return true; }
 }

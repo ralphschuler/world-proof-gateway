@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { createGateway } from "../src/gateway.js";
 import { createHttpHandler } from "../src/http-app.js";
 import { MemoryProofStore } from "../src/store.js";
+import { createOwnerAuth } from "../src/owner-auth.js";
 
 async function withApp(run) {
   const store = new MemoryProofStore();
@@ -24,6 +25,39 @@ test("demo mode serves labeled onboarding and a healthy non-verifying path", asy
     const blocked = await (await fetch(`${base}/v1/projects/demo/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
     assert.deepEqual(blocked, { error: "demo_mode_real_proofs_disabled", demo: true });
   });
+});
+
+test("only an admin bootstrap can enroll an owner, and Portal-issued RP keys are never returned", async () => {
+  const store = new MemoryProofStore();
+  const ownerAuth = createOwnerAuth({ store, appId: "app_gateway", rpId: "rp_gateway", signingKey: `0x${"12".repeat(32)}`, sessionSecret: "test session secret with enough entropy", environment: "staging", fetchImpl: async () => new Response(JSON.stringify({ success: true, action: "gateway-owner-login-v1", environment: "staging", nullifier: "0x99" })) });
+  const records = [];
+  const registry = { async listForOwner(id) { return records.filter((p) => p.owner === id).map(({ owner, ...p }) => p); }, async createForOwner(id, input) { const tenant = { ...input, owner: id, status: "active" }; records.push(tenant); return tenant; } };
+  const gateway = createGateway({ projects: new Map(), store });
+  const server = createServer(createHttpHandler({ gateway, store, tenantRegistry: registry, ownerAuth, adminToken: "bootstrap-token" }));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    assert.equal((await fetch(`${base}/v1/owner/projects`)).status, 401);
+    const context = await (await fetch(`${base}/v1/owner/proof-context`, { method: "POST" })).json();
+    const login = await fetch(`${base}/v1/owner/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idkitResponse: { nonce: context.rp_context.nonce, action: context.action, environment: context.environment } }) });
+    assert.equal(login.status, 403);
+    assert.equal((await fetch(`${base}/v1/admin/owner/proof-context`, { method: "POST" })).status, 401);
+    const bootstrapContext = await (await fetch(`${base}/v1/admin/owner/proof-context`, { method: "POST", headers: { authorization: "Bearer bootstrap-token" } })).json();
+    const bootstrap = await fetch(`${base}/v1/admin/owner/proofs`, { method: "POST", headers: { authorization: "Bearer bootstrap-token", "content-type": "application/json" }, body: JSON.stringify({ idkitResponse: { nonce: bootstrapContext.rp_context.nonce, action: bootstrapContext.action, environment: bootstrapContext.environment } }) });
+    assert.equal(bootstrap.status, 200);
+    const session = bootstrap.headers.get("set-cookie");
+    assert.match(session, /HttpOnly; Secure; SameSite=Lax/);
+    const insecureCreate = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json" }, body: "{}" });
+    assert.deepEqual(await insecureCreate.json(), { error: "https_required" });
+    const created = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json", "x-forwarded-proto": "https" }, body: JSON.stringify({ id: "owner-project", appId: "app_owner", rpId: "rp_owner", rpSigningKey: `0x${"34".repeat(32)}`, action: "owner-project-access", environment: "staging", allowedOrigins: ["https://example.test"], signalPolicy: "none" }) });
+    assert.equal(created.status, 201);
+    const createdBody = await created.json();
+    assert.equal(createdBody.rp_signing_key, undefined);
+    assert.doesNotMatch(JSON.stringify(createdBody), /0x343434/);
+    const listed = await (await fetch(`${base}/v1/owner/projects`, { headers: { cookie: session } })).json();
+    assert.equal(listed.projects.length, 1);
+    assert.doesNotMatch(JSON.stringify(listed), /rpSigningKey|0x343434/);
+  } finally { await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
 });
 
 test("billing is read-only and support intake is explicitly non-durable", async () => {

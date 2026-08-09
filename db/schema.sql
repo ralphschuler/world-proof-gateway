@@ -10,10 +10,33 @@ CREATE TABLE IF NOT EXISTS tenant_projects (
   signal_policy TEXT NOT NULL CHECK (signal_policy IN ('none', 'wallet-address')),
   attestation JSONB,
   signing_key_envelope TEXT NOT NULL,
+  owner_nullifier NUMERIC(78,0),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS tenant_projects_owner_nullifier_idx ON tenant_projects(owner_nullifier);
+
+CREATE TABLE IF NOT EXISTS owner_proof_contexts (
+  nonce TEXT PRIMARY KEY,
+  action TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS owner_nullifiers (
+  nullifier NUMERIC(78,0) PRIMARY KEY,
+  first_login_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- An owner record is an explicit administrator-approved enrollment, not an
+-- automatic side effect of a successful World ID proof. Keep this additive so
+-- existing MVP databases retain their historical enrollment timestamp.
+ALTER TABLE owner_nullifiers ADD COLUMN IF NOT EXISTS enrolled_at TIMESTAMPTZ;
+UPDATE owner_nullifiers SET enrolled_at = COALESCE(enrolled_at, first_login_at) WHERE enrolled_at IS NULL;
+ALTER TABLE owner_nullifiers ALTER COLUMN enrolled_at SET NOT NULL;
 
 CREATE TABLE IF NOT EXISTS proof_contexts (
   nonce TEXT PRIMARY KEY,

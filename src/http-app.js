@@ -1,4 +1,5 @@
 import { onboardingPage } from "./onboarding.js";
+import { dashboardPage } from "./dashboard.js";
 import { timingSafeEqual } from "node:crypto";
 
 function reply(res, status, body, origin) {
@@ -20,12 +21,20 @@ function authorized(req, token) {
   if (!token || !supplied || supplied.length !== token.length) return false;
   return timingSafeEqual(Buffer.from(supplied), Buffer.from(token));
 }
+function secureRequest(req) { return req.socket.encrypted === true || req.headers["x-forwarded-proto"] === "https"; }
+function publicTenant(tenant) {
+  const { rpSigningKey, signingKey, signing_key_envelope, ...safe } = tenant || {};
+  return safe;
+}
+function cookie(req, name) { return req.headers.cookie?.split(/;\s*/).find((entry) => entry.startsWith(`${name}=`))?.slice(name.length + 1); }
+function ownerCookie(value) { return `wpg_owner_session=${value}; Path=/; Max-Age=28800; HttpOnly; Secure; SameSite=Lax`; }
 
-export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, adminToken = null, billing = null }) {
+export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, adminToken = null, billing = null, ownerAuth = null }) {
   if (!gateway || !store) throw new Error("http_dependencies_required");
   return async (req, res) => {
     const origin = req.headers.origin;
     if (req.method === "GET" && req.url === "/") return html(res, onboardingPage({ demoMode, billingPlan: billing?.plan }));
+    if (req.method === "GET" && req.url === "/dashboard") return html(res, dashboardPage());
     if (req.method === "GET" && req.url === "/healthz") {
       try { await store.health(); return reply(res, 200, { ok: true, mode: demoMode ? "demo" : "production" }); }
       catch { return reply(res, 503, { ok: false, error: "store_unavailable" }); }
@@ -34,7 +43,13 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
     if (req.url === "/v1/billing/intents") {
       if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" }, origin);
       if (demoMode || !billing) return reply(res, 503, { error: "billing_unavailable" }, origin);
-      try { const result = await billing.createIntent(await body(req)); return reply(res, result.status, result.body, origin); }
+      const owner = ownerAuth?.session(cookie(req, "wpg_owner_session"));
+      if (ownerAuth && !owner) return reply(res, 401, { error: "owner_auth_required" }, origin);
+      try {
+        const input = await body(req);
+        if (ownerAuth && tenantRegistry && !(await tenantRegistry.listForOwner(owner)).some((project) => project.id === input.projectId)) return reply(res, 403, { error: "project_not_owned" }, origin);
+        const result = await billing.createIntent(input); return reply(res, result.status, result.body, origin);
+      }
       catch { return reply(res, 400, { error: "billing_intent_failed" }, origin); }
     }
     if (req.url === "/v1/billing/confirmations") {
@@ -49,6 +64,39 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
       if (!authorized(req, adminToken)) return reply(res, 401, { error: "unauthorized" });
       try { return reply(res, 201, { tenant: await tenantRegistry.create(await body(req)) }); }
       catch { return reply(res, 400, { error: "tenant_create_failed" }); }
+    }
+    if (req.url === "/v1/owner/proof-context") {
+      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
+      if (demoMode || !ownerAuth) return reply(res, 503, { error: "owner_auth_unavailable" });
+      try { const result = await ownerAuth.proofContext(); return reply(res, result.status, result.body); } catch { return reply(res, 503, { error: "owner_auth_unavailable" }); }
+    }
+    if (req.url === "/v1/owner/proofs") {
+      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
+      if (demoMode || !ownerAuth) return reply(res, 503, { error: "owner_auth_unavailable" });
+      try { const result = await ownerAuth.verify(await body(req)); if (result.status !== 200) return reply(res, result.status, result.body); res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "set-cookie": ownerCookie(result.body.session) }); return res.end(JSON.stringify({ verified: true })); } catch { return reply(res, 400, { error: "invalid_json" }); }
+    }
+    if (req.url === "/v1/admin/owner/proof-context" || req.url === "/v1/admin/owner/proofs") {
+      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
+      if (demoMode || !ownerAuth) return reply(res, 503, { error: "owner_auth_unavailable" });
+      if (!authorized(req, adminToken)) return reply(res, 401, { error: "unauthorized" });
+      try {
+        const result = req.url.endsWith("proof-context") ? await ownerAuth.proofContext() : await ownerAuth.verify({ ...(await body(req)), bootstrap: true });
+        if (result.status !== 200) return reply(res, result.status, result.body);
+        if (req.url.endsWith("proof-context")) return reply(res, result.status, result.body);
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store", "set-cookie": ownerCookie(result.body.session) });
+        return res.end(JSON.stringify({ verified: true, enrolled: true }));
+      } catch { return reply(res, 400, { error: "invalid_json" }); }
+    }
+    if (req.url === "/v1/owner/projects") {
+      if (!ownerAuth || !tenantRegistry) return reply(res, 503, { error: "owner_dashboard_unavailable" });
+      const owner = ownerAuth.session(cookie(req, "wpg_owner_session"));
+      if (!owner) return reply(res, 401, { error: "owner_auth_required" });
+      if (req.method === "GET") return reply(res, 200, { projects: (await tenantRegistry.listForOwner(owner)).map(publicTenant) });
+      if (req.method === "POST") {
+        if (!secureRequest(req)) return reply(res, 400, { error: "https_required" });
+        try { const tenant = await tenantRegistry.createForOwner(owner, await body(req)); return reply(res, 201, { tenant: publicTenant(tenant), portal_configuration_required: true }); } catch { return reply(res, 400, { error: "tenant_create_failed" }); }
+      }
+      return reply(res, 405, { error: "method_not_allowed" });
     }
     if (req.url === "/v1/support-requests") {
       if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" }, origin);

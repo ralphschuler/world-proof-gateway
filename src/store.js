@@ -7,6 +7,8 @@ export class MemoryProofStore {
   #supportRequests = [];
   #billingOrders = new Map();
   #credits = new Map();
+  #ownerContexts = new Map();
+  #ownerNullifiers = new Set();
 
   async saveContext(context) { this.#contexts.set(context.nonce, context); }
   async consumeContext(nonce) {
@@ -43,4 +45,13 @@ export class MemoryProofStore {
     return { remainingRequests: remaining - 1 };
   }
   async restoreProjectRequestCredit(projectId) { this.#credits.set(projectId, (this.#credits.get(projectId) || 0) + 1); }
+  async saveOwnerContext(context) { this.#ownerContexts.set(context.nonce, context); }
+  async consumeOwnerContext(nonce) { const context = this.#ownerContexts.get(nonce); if (!context || context.consumed || context.expiresAt <= Date.now()) return null; context.consumed = true; return context; }
+  async isOwnerEnrolled(nullifier) { return this.#ownerNullifiers.has(nullifier); }
+  async enrollOwnerNullifier(nullifier) {
+    if (this.#ownerNullifiers.has(nullifier)) return false;
+    this.#ownerNullifiers.add(nullifier);
+    return true;
+  }
+  async recordOwnerLogin(nullifier) { return this.#ownerNullifiers.has(nullifier); }
 }
