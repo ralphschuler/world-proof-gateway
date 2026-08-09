@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS tenant_projects (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Existing installations predate per-owner project scoping, so this must be
+-- additive before the index is created.
+ALTER TABLE tenant_projects ADD COLUMN IF NOT EXISTS owner_nullifier NUMERIC(78,0);
 CREATE INDEX IF NOT EXISTS tenant_projects_owner_nullifier_idx ON tenant_projects(owner_nullifier);
 
 CREATE TABLE IF NOT EXISTS owner_proof_contexts (
