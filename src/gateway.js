@@ -15,13 +15,11 @@ function responseSignal(response) { return response?.responses?.[0]?.signal_hash
 export function createGateway({ projects, store, fetchImpl = globalThis.fetch, attestationKey, now = () => Date.now() }) {
   if (!projects || !store || typeof fetchImpl !== "function") throw new Error("gateway_dependencies_required");
   const signer = attestationKey ? privateKeyToAccount(attestationKey) : null;
-  if ([...projects.values()].some((project) => project.attestation) && !signer) throw new Error("attestation_key_required");
-
-  function projectFor(projectId) { return projects.get(projectId); }
+  async function projectFor(projectId) { return projects.get(projectId); }
   function originAllowed(project, origin) { return !origin || project.allowedOrigins.includes(origin); }
 
   async function proofContext(projectId, { action, signal } = {}, origin) {
-    const project = projectFor(projectId);
+    const project = await projectFor(projectId);
     if (!project) return json(404, { error: "unknown_project" });
     if (!originAllowed(project, origin)) return json(403, { error: "origin_not_allowed" });
     if (action !== project.action) return json(400, { error: "action_not_allowed" });
@@ -34,7 +32,7 @@ export function createGateway({ projects, store, fetchImpl = globalThis.fetch, a
   }
 
   async function verify(projectId, { idkitResponse } = {}, origin) {
-    const project = projectFor(projectId);
+    const project = await projectFor(projectId);
     if (!project) return json(404, { error: "unknown_project" });
     if (!originAllowed(project, origin)) return json(403, { error: "origin_not_allowed" });
     const nonce = idkitResponse?.nonce;
@@ -52,6 +50,7 @@ export function createGateway({ projects, store, fetchImpl = globalThis.fetch, a
     if (!nullifier) return json(422, { error: "world_nullifier_missing" });
     if (!await store.claimNullifier({ projectId, action: project.action, nullifier: BigInt(nullifier).toString(10) })) return json(409, { error: "nullifier_already_used" });
     const result = { verified: true, project_id: projectId, action: project.action, verification_id: crypto.randomUUID() };
+    if (project.attestation && !signer) return json(503, { error: "gateway_attestation_unavailable" });
     if (project.attestation && signer) {
       const deadline = Math.floor(now() / 1000) + (project.attestation.ttlSeconds || 300);
       if (!wallet.test(context.subject || "")) return json(422, { error: "wallet_subject_required" });

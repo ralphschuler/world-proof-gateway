@@ -9,7 +9,7 @@ World Proof Gateway is a multi-tenant verification service for teams that build 
 3. The customer provides the RP signing key through a secrets manager, never through the dashboard, source repository or support chat.
 4. The operator adds a fixed project entry, deploys it, and returns the public project ID plus API endpoints.
 
-Each tenant has its own app, RP, action, key, allowed origins and nullifier namespace. Static frontends receive no private key.
+Each tenant has its own app, RP, action, key, allowed origins and nullifier namespace. Tenant RP signing keys are encrypted at rest in PostgreSQL using the platform's distinct `GATEWAY_TENANT_ENCRYPTION_KEY`; static frontends receive no private key. Gateway's own `RP_SIGNING_KEY` is reserved for Gateway owner authentication and is never shared with a tenant.
 
 ## Product boundary
 

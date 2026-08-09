@@ -1,13 +1,13 @@
 {
   "projects": [
     {
-      "id": "idlemint",
+      "id": "tenant-example",
       "appId": "app_replace_me",
       "rpId": "rp_replace_me",
-      "action": "idlemint-game-access-v1",
+      "action": "tenant-access-v1",
       "environment": "production",
-      "signingKeyEnv": "IDLEMINT_RP_SIGNING_KEY",
-      "allowedOrigins": ["https://nyphon.de"],
+      "signingKeyEnv": "TENANT_EXAMPLE_RP_SIGNING_KEY",
+      "allowedOrigins": ["https://app.example.com"],
       "signalPolicy": "wallet-address",
       "attestation": {
         "chainId": 480,

@@ -1,0 +1,40 @@
+# TrueNAS Apps → Discover → ⋮ → Install via YAML
+# Production bundle: Gateway plus private PostgreSQL. Enter every REPLACE_* value
+# only in TrueNAS's secret/environment editor; never commit a real value here.
+services:
+  world-proof-gateway:
+    image: ghcr.io/ralphschuler/world-proof-gateway:latest
+    command: sh -c "npm run migrate && npm start"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATABASE_URL: postgres://gateway:REPLACE_POSTGRES_PASSWORD@postgres:5432/world_proof_gateway
+      GATEWAY_TENANT_ENCRYPTION_KEY: REPLACE_32_BYTE_ENCRYPTION_KEY
+      GATEWAY_ADMIN_TOKEN: REPLACE_RANDOM_ADMIN_TOKEN
+      # Platform-owned World ID key only. Never use it as a tenant RP key.
+      RP_SIGNING_KEY: REPLACE_GATEWAY_RP_SIGNING_KEY
+      # Optional: only needed by tenants using EIP-712 attestations.
+      GATEWAY_ATTESTATION_KEY: REPLACE_OPTIONAL_ATTESTATION_KEY
+    ports:
+      - "31056:8787"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: world_proof_gateway
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: REPLACE_POSTGRES_PASSWORD
+    volumes:
+      - world_proof_gateway_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d world_proof_gateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  world_proof_gateway_postgres:

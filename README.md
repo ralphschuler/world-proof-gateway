@@ -4,21 +4,25 @@ Deployable, multi-tenant **trusted backend boundary** for World-ID-enabled, most
 
 ## What this unlocks
 
-Each tenant/project registers a fixed `app_id`, `rp_id`, action, allowed browser origins and one private RP signing key. The static app only needs two endpoints:
+Each tenant/project registers a fixed `app_id`, `rp_id`, action, allowed browser origins and one private RP signing key. The platform encrypts each tenant key with AES-256-GCM before storing it in PostgreSQL; it decrypts it only in memory while creating that tenant's `rp_context`. The static app only needs two endpoints:
 
 1. `POST /v1/projects/:project/proof-context` with its fixed action and optional signal.
 2. `POST /v1/projects/:project/proofs` with the untouched `idkitResponse`.
 
 The gateway signs the context server-side, sends the untouched proof to World, and atomically records the `(project, action, nullifier)` tuple. It does **not** accept client-provided RP IDs, app IDs or arbitrary actions.
 
+`RP_SIGNING_KEY` is reserved for the Gateway's own World ID owner/authentication flow. It is not a tenant key and is never reused to sign tenant proofs. `GATEWAY_TENANT_ENCRYPTION_KEY` protects tenant RP keys at rest; `GATEWAY_ATTESTATION_KEY` is a separate optional EIP-712 signing key.
+
 For Mini Apps whose gameplay is fully on-chain, the gateway issues a short-lived EIP-712 attestation after verification. `contracts/src/WorldProofGate.sol` validates that attestation and prevents replay. This keeps game state in the contract while making the gateway the explicit, auditable identity trust boundary. World ID 4 on-chain verification is documented as preview/not mainnet-ready, so this attestation must not be silently substituted for direct World proof verification.
 
 ## Run locally
 
 ```bash
-cp config/projects.example.json config/projects.json
-# Put the RP signing key only in the process secret environment.
-export IDLEMINT_RP_SIGNING_KEY=0x...
+# Put keys only in process secret environment. `RP_SIGNING_KEY` belongs to the
+# Gateway's own World RP; individual tenant keys are encrypted in PostgreSQL.
+export RP_SIGNING_KEY=0x...
+export GATEWAY_TENANT_ENCRYPTION_KEY=replace-with-32-byte-base64url-or-64-hex-key
+export GATEWAY_ADMIN_TOKEN=replace-with-long-random-token
 npm install
 npm test
 npm start
@@ -51,6 +55,12 @@ Demo mode identifies itself in both `/` and `/healthz`. Its health check succeed
 3. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
 4. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
 
+### Tenant provisioning
+
+The production control plane exposes `POST /v1/admin/tenants`, guarded by `Authorization: Bearer $GATEWAY_ADMIN_TOKEN`. It accepts a tenant's World configuration and `rpSigningKey`, stores only its encrypted envelope, and never returns the key. This endpoint is deliberately server-admin-only until Gateway owner authentication and audit logging are complete. Do not expose it directly to browsers.
+
+For fully managed tenants, World Proof Gateway must create/rotate each tenant RP in the authorized World Developer Portal and store the one-time returned key through this control plane. For bring-your-own World projects, the tenant supplies its RP configuration/key through an authenticated onboarding flow. Both modes require one distinct RP key per tenant RP.
+
 For a Custom App review/demo deployment, use the same container with `DEMO_MODE=true` and omit real World/database configuration. The page must remain visibly marked DEMO. This mode is only suitable for health checks and onboarding review, never for proof verification or asset crediting.
 
 The public client contract is in [docs/API.md](docs/API.md); the current private-beta SaaS model is in [docs/SAAS.md](docs/SAAS.md).
@@ -59,7 +69,11 @@ The public client contract is in [docs/API.md](docs/API.md); the current private
 
 `deploy/truenas-demo.yaml` installs a public, 24-hour demo image through **Apps → Discover → Install via YAML**. It uses only port `31056` and starts with `DEMO_MODE=true`: onboarding and support UI are testable, while real proofs, WLD transfers, tenant setup and secret storage are all blocked. Production images remain in GHCR and require registry credentials.
 
-The installed demo also exposes an empty `IDLEMINT_RP_SIGNING_KEY` field in its TrueNAS App environment. Enter the RP signing key only in the TrueNAS secret/environment editor; it must never be committed, pasted into a Mini App, or placed in a `VITE_*` variable. The value is intentionally ignored while `DEMO_MODE=true`.
+The installed demo also exposes an empty `RP_SIGNING_KEY` field in its TrueNAS App environment. Enter the Gateway's own World RP key only in the TrueNAS secret/environment editor; it must never be committed, pasted into a Mini App, or placed in a `VITE_*` variable. The value is intentionally ignored while `DEMO_MODE=true`.
+
+### TrueNAS production bundle
+
+`deploy/truenas-production.yaml` runs the Gateway and its private PostgreSQL database as one Custom App. PostgreSQL has no host port; its named volume persists data. Before installing it, replace the placeholder values in TrueNAS's secret editor: database password, 32-byte tenant-encryption key, admin token and (only for Gateway's own World ID owner flow) `RP_SIGNING_KEY`. The image reference must point to a published, immutable production image; do not use the 24-hour demo image for real proofs.
 
 ## Deployment guardrails
 
@@ -71,7 +85,7 @@ The installed demo also exposes an empty `IDLEMINT_RP_SIGNING_KEY` field in its 
 
 ## IdleMint adoption
 
-Set IdleMint's existing `VITE_WORLD_ID_PROOF_CONTEXT_URL` and `VITE_WORLD_ID_VERIFY_URL` to its fixed project endpoints after this service has a real registered RP and durable database. Browser demo mode remains local and need not call this service.
+After a tenant is registered and active, set its static client to the fixed `/v1/projects/{tenantId}/proof-context` and `/v1/projects/{tenantId}/proofs` endpoints. Browser demo mode remains local and need not call this service.
 
 ## Sources
 

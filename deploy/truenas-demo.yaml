@@ -11,7 +11,7 @@ services:
       PORT: "8787"
       # Replace only in TrueNAS App configuration when production proof
       # verification is being configured. Demo mode never reads this value.
-      IDLEMINT_RP_SIGNING_KEY: ""
+      RP_SIGNING_KEY: ""
     ports:
       - "31056:8787"
     restart: unless-stopped
