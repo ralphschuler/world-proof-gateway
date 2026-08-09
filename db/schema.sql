@@ -32,3 +32,24 @@ CREATE TABLE IF NOT EXISTS verified_nullifiers (
   verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (project_id, action, nullifier)
 );
+
+-- Payment references are one-time, short lived, and reconciled only after the
+-- World Developer Portal reports an on-chain mined payment.
+CREATE TABLE IF NOT EXISTS billing_orders (
+  reference TEXT PRIMARY KEY CHECK (reference ~ '^wpg_[a-f0-9]{32}$'),
+  project_id TEXT NOT NULL REFERENCES tenant_projects(id),
+  price_atomic NUMERIC(30,0) NOT NULL CHECK (price_atomic > 0),
+  request_credits INTEGER NOT NULL CHECK (request_credits > 0),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'credited')),
+  transaction_id TEXT UNIQUE,
+  transaction_hash TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  credited_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS project_request_credits (
+  project_id TEXT PRIMARY KEY REFERENCES tenant_projects(id),
+  remaining_requests BIGINT NOT NULL DEFAULT 0 CHECK (remaining_requests >= 0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

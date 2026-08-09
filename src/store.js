@@ -5,6 +5,8 @@ export class MemoryProofStore {
   #contexts = new Map();
   #nullifiers = new Set();
   #supportRequests = [];
+  #billingOrders = new Map();
+  #credits = new Map();
 
   async saveContext(context) { this.#contexts.set(context.nonce, context); }
   async consumeContext(nonce) {
@@ -23,4 +25,15 @@ export class MemoryProofStore {
   // Explicitly non-production: this is intentionally lost on restart.
   async saveSupportRequest(request) { this.#supportRequests.push(request); }
   async listSupportRequests() { return [...this.#supportRequests]; }
+  async createBillingOrder(order) { this.#billingOrders.set(order.reference, { ...order, status: "pending" }); }
+  async getBillingOrder(reference) { const order = this.#billingOrders.get(reference); return order ? { ...order } : null; }
+  async creditBillingOrder({ reference, transactionId, transactionHash }) {
+    const order = this.#billingOrders.get(reference);
+    if (!order || order.status !== "pending" || Date.parse(order.expiresAt) <= Date.now()) return null;
+    if ([...this.#billingOrders.values()].some((entry) => entry.transactionId === transactionId)) return null;
+    order.status = "credited"; order.transactionId = transactionId; order.transactionHash = transactionHash;
+    const remainingRequests = (this.#credits.get(order.projectId) || 0) + order.requestCredits;
+    this.#credits.set(order.projectId, remainingRequests);
+    return { remainingRequests };
+  }
 }

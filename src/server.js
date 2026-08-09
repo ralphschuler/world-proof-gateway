@@ -5,6 +5,7 @@ import { PostgresProofStore } from "./postgres-store.js";
 import { createHttpHandler } from "./http-app.js";
 import { createTenantKeyVault } from "./crypto.js";
 import { PostgresTenantRegistry } from "./tenant-registry.js";
+import { createBillingService } from "./billing.js";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "0.0.0.0";
@@ -16,6 +17,12 @@ const store = !demoMode && process.env.DATABASE_URL ? new PostgresProofStore(pro
 const tenantRegistry = !demoMode ? new PostgresTenantRegistry(process.env.DATABASE_URL, createTenantKeyVault(process.env.GATEWAY_TENANT_ENCRYPTION_KEY)) : null;
 const projects = tenantRegistry || new Map();
 const gateway = createGateway({ projects, store, attestationKey: process.env.GATEWAY_ATTESTATION_KEY });
-const server = createServer(createHttpHandler({ gateway, store, demoMode, tenantRegistry, adminToken: process.env.GATEWAY_ADMIN_TOKEN }));
+const billing = createBillingService({
+  store,
+  receiverAddress: process.env.WLD_RECEIVER_ADDRESS,
+  appId: process.env.WORLD_APP_ID,
+  developerApiKey: process.env.WORLD_DEVELOPER_API_KEY,
+});
+const server = createServer(createHttpHandler({ gateway, store, demoMode, tenantRegistry, adminToken: process.env.GATEWAY_ADMIN_TOKEN, billing }));
 server.listen(port, host, () => console.log(`World Proof Gateway listening on ${host}:${port}`));
 process.on("SIGTERM", () => server.close(() => Promise.all([store.close?.(), tenantRegistry?.close?.()]).finally(() => process.exit(0))));

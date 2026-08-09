@@ -32,9 +32,13 @@ npm start
 
 ## Private-beta onboarding and demo mode
 
-`GET /` serves a minimal browser onboarding page. It explains World ID, separate wallet authentication, WLD billing readiness, a deliberately non-functional unique setup-link placeholder, and a support form. Ordinary browser visitors can safely use this page; it never requests a proof, connects a wallet, or starts a payment.
+`GET /` serves a mobile-first checkout surface. In World App it uses MiniKit Pay; in a regular browser it clearly explains that WLD checkout needs World App.
 
-`GET /v1/billing/plan` is a read-only configuration view. It explicitly reports that WLD billing is not ready and that charging, prices, receivers, payment collection, MiniKit Pay, and token transfers are absent.
+## WLD request packs
+
+The initial plan is fixed at **1 WLD for 5,000 verified-proof requests**. The browser asks World App's MiniKit Pay command for a one-time payment reference. The gateway then queries the World Developer Portal itself and credits the project only when the response is `mined` and its reference, app ID, World Chain, WLD amount, receiver and transaction ID all match exactly. A browser response alone can never create credits.
+
+Set `WLD_RECEIVER_ADDRESS`, `WORLD_APP_ID` and `WORLD_DEVELOPER_API_KEY` only in server-side deployment secret storage. The Portal API key is used solely to verify payment transactions; never expose it to a Mini App, static host or browser variable. `GET /v1/billing/plan` reports readiness. `POST /v1/billing/intents` creates a 15-minute reference for an existing project and `POST /v1/billing/confirmations` completes an already-submitted MiniKit payment after server-side reconciliation.
 
 `POST /v1/support-requests` accepts only an email and a short message. With the in-memory test/demo store it is explicitly non-production and is lost on restart. With PostgreSQL it returns `503` until a reviewed durable support schema is added; do not use it for production support intake yet.
 

@@ -14,6 +14,10 @@ services:
       GATEWAY_ADMIN_TOKEN: REPLACE_RANDOM_ADMIN_TOKEN
       # Platform-owned World ID key only. Never use it as a tenant RP key.
       RP_SIGNING_KEY: REPLACE_GATEWAY_RP_SIGNING_KEY
+      # 1 WLD / 5,000 requests. Both receiver and Developer Portal API key stay server-side.
+      WLD_RECEIVER_ADDRESS: REPLACE_WLD_RECEIVER_ADDRESS
+      WORLD_APP_ID: REPLACE_WORLD_APP_ID
+      WORLD_DEVELOPER_API_KEY: REPLACE_WORLD_DEVELOPER_API_KEY
       # Optional: only needed by tenants using EIP-712 attestations.
       GATEWAY_ATTESTATION_KEY: REPLACE_OPTIONAL_ATTESTATION_KEY
     ports:

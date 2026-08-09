@@ -27,6 +27,30 @@ export class PostgresProofStore {
     );
     return result.rowCount === 1;
   }
+  async createBillingOrder({ reference, projectId, priceAtomic, requestCredits, expiresAt }) {
+    await this.#pool.query(
+      "INSERT INTO billing_orders (reference, project_id, price_atomic, request_credits, expires_at) VALUES ($1,$2,$3,$4,$5)",
+      [reference, projectId, priceAtomic, requestCredits, expiresAt],
+    );
+  }
+  async getBillingOrder(reference) {
+    const result = await this.#pool.query("SELECT reference, project_id, request_credits, status, expires_at FROM billing_orders WHERE reference = $1", [reference]);
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    return { reference: row.reference, projectId: row.project_id, requestCredits: row.request_credits, status: row.status, expiresAt: row.expires_at.toISOString() };
+  }
+  async creditBillingOrder({ reference, transactionId, transactionHash }) {
+    const client = await this.#pool.connect();
+    try {
+      await client.query("BEGIN");
+      const order = await client.query("UPDATE billing_orders SET status = 'credited', transaction_id = $2, transaction_hash = $3, credited_at = NOW() WHERE reference = $1 AND status = 'pending' AND expires_at > NOW() RETURNING project_id, request_credits", [reference, transactionId, transactionHash]);
+      if (!order.rowCount) { await client.query("ROLLBACK"); return null; }
+      const row = order.rows[0];
+      const credit = await client.query("INSERT INTO project_request_credits (project_id, remaining_requests) VALUES ($1,$2) ON CONFLICT (project_id) DO UPDATE SET remaining_requests = project_request_credits.remaining_requests + EXCLUDED.remaining_requests, updated_at = NOW() RETURNING remaining_requests", [row.project_id, row.request_credits]);
+      await client.query("COMMIT");
+      return { remainingRequests: credit.rows[0].remaining_requests };
+    } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+  }
   async close() { await this.#pool.end(); }
   async health() { await this.#pool.query("SELECT 1"); return true; }
 }

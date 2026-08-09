@@ -1,4 +1,4 @@
-import { onboardingPage, betaBillingPlan } from "./onboarding.js";
+import { onboardingPage } from "./onboarding.js";
 import { timingSafeEqual } from "node:crypto";
 
 function reply(res, status, body, origin) {
@@ -21,16 +21,28 @@ function authorized(req, token) {
   return timingSafeEqual(Buffer.from(supplied), Buffer.from(token));
 }
 
-export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, adminToken = null }) {
+export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, adminToken = null, billing = null }) {
   if (!gateway || !store) throw new Error("http_dependencies_required");
   return async (req, res) => {
     const origin = req.headers.origin;
-    if (req.method === "GET" && req.url === "/") return html(res, onboardingPage({ demoMode }));
+    if (req.method === "GET" && req.url === "/") return html(res, onboardingPage({ demoMode, billingPlan: billing?.plan }));
     if (req.method === "GET" && req.url === "/healthz") {
       try { await store.health(); return reply(res, 200, { ok: true, mode: demoMode ? "demo" : "production" }); }
       catch { return reply(res, 503, { ok: false, error: "store_unavailable" }); }
     }
-    if (req.method === "GET" && req.url === "/v1/billing/plan") return reply(res, 200, betaBillingPlan, origin);
+    if (req.method === "GET" && req.url === "/v1/billing/plan") return reply(res, 200, billing?.plan || { mode: "unavailable", charging_enabled: false, wld_billing_ready: false, message: "Billing is unavailable." }, origin);
+    if (req.url === "/v1/billing/intents") {
+      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" }, origin);
+      if (demoMode || !billing) return reply(res, 503, { error: "billing_unavailable" }, origin);
+      try { const result = await billing.createIntent(await body(req)); return reply(res, result.status, result.body, origin); }
+      catch { return reply(res, 400, { error: "billing_intent_failed" }, origin); }
+    }
+    if (req.url === "/v1/billing/confirmations") {
+      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" }, origin);
+      if (demoMode || !billing) return reply(res, 503, { error: "billing_unavailable" }, origin);
+      try { const result = await billing.confirmPayment(await body(req)); return reply(res, result.status, result.body, origin); }
+      catch { return reply(res, 502, { error: "billing_confirmation_failed" }, origin); }
+    }
     if (req.url === "/v1/admin/tenants") {
       if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
       if (demoMode || !tenantRegistry) return reply(res, 503, { error: "tenant_admin_unavailable" });
