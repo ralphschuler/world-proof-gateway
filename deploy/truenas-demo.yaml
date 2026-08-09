@@ -1,5 +1,6 @@
 # TrueNAS Apps → Discover → ⋮ → Install via YAML
-# Deliberately LAN-only and non-financial. No World secret is included.
+# Deliberately non-financial. The RP signing-key field stays empty until it is
+# entered directly in TrueNAS; never commit a World signing key here.
 services:
   world-proof-gateway-demo:
     image: ttl.sh/world-proof-gateway-demo:24h
@@ -8,6 +9,9 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "8787"
+      # Replace only in TrueNAS App configuration when production proof
+      # verification is being configured. Demo mode never reads this value.
+      IDLEMINT_RP_SIGNING_KEY: ""
     ports:
       - "31056:8787"
     restart: unless-stopped

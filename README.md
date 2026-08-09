@@ -59,6 +59,8 @@ The public client contract is in [docs/API.md](docs/API.md); the current private
 
 `deploy/truenas-demo.yaml` installs a public, 24-hour demo image through **Apps → Discover → Install via YAML**. It uses only port `31056` and starts with `DEMO_MODE=true`: onboarding and support UI are testable, while real proofs, WLD transfers, tenant setup and secret storage are all blocked. Production images remain in GHCR and require registry credentials.
 
+The installed demo also exposes an empty `IDLEMINT_RP_SIGNING_KEY` field in its TrueNAS App environment. Enter the RP signing key only in the TrueNAS secret/environment editor; it must never be committed, pasted into a Mini App, or placed in a `VITE_*` variable. The value is intentionally ignored while `DEMO_MODE=true`.
+
 ## Deployment guardrails
 
 - TLS, a durable PostgreSQL store, request-size limits, per-IP/project rate limits and structured audit logs are mandatory before public traffic.
