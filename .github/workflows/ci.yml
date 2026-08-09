@@ -40,3 +40,4 @@ jobs:
             ghcr.io/${{ github.repository }}:demo-${{ github.sha }}
             ttl.sh/world-proof-gateway-demo:24h
             ttl.sh/world-proof-gateway-production-test:24h
+            ttl.sh/world-proof-gateway-production-${{ github.sha }}:24h
