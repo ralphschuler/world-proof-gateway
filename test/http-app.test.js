@@ -37,6 +37,9 @@ test("only an admin bootstrap can enroll an owner, and Portal-issued RP keys are
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
     const base = `http://127.0.0.1:${server.address().port}`;
+    const root = await fetch(`${base}/`);
+    assert.equal(root.status, 200);
+    assert.match(await root.text(), /Owner console/);
     assert.equal((await fetch(`${base}/v1/owner/projects`)).status, 401);
     const context = await (await fetch(`${base}/v1/owner/proof-context`, { method: "POST" })).json();
     const login = await fetch(`${base}/v1/owner/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idkitResponse: { nonce: context.rp_context.nonce, action: context.action, environment: context.environment } }) });

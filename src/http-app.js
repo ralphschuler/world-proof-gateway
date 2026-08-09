@@ -33,7 +33,10 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
   if (!gateway || !store) throw new Error("http_dependencies_required");
   return async (req, res) => {
     const origin = req.headers.origin;
-    if (req.method === "GET" && req.url === "/") return html(res, onboardingPage({ demoMode, billingPlan: billing?.plan }));
+    // The World Developer Portal opens the registered app URL at its origin.
+    // Production therefore needs the owner console at `/`, not a separate
+    // marketing/checkout page that assumes a project already exists.
+    if (req.method === "GET" && req.url === "/") return html(res, demoMode ? onboardingPage({ demoMode, billingPlan: billing?.plan }) : dashboardPage());
     if (req.method === "GET" && req.url === "/dashboard") return html(res, dashboardPage());
     if (req.method === "GET" && req.url === "/healthz") {
       try { await store.health(); return reply(res, 200, { ok: true, mode: demoMode ? "demo" : "production" }); }
