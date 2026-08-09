@@ -1,0 +1,13 @@
+# TrueNAS Apps → Discover → ⋮ → Install via YAML
+# Deliberately LAN-only and non-financial. No World secret is included.
+services:
+  world-proof-gateway-demo:
+    image: ghcr.io/ralphschuler/world-proof-gateway:demo-latest
+    environment:
+      DEMO_MODE: "true"
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+    ports:
+      - "31056:8787"
+    restart: unless-stopped

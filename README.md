@@ -55,6 +55,10 @@ For a Custom App review/demo deployment, use the same container with `DEMO_MODE=
 
 The public client contract is in [docs/API.md](docs/API.md); the current private-beta SaaS model is in [docs/SAAS.md](docs/SAAS.md).
 
+### TrueNAS demo
+
+`deploy/truenas-demo.yaml` installs the published `demo-latest` image through **Apps → Discover → Install via YAML**. It uses only port `31056` and starts with `DEMO_MODE=true`: onboarding and support UI are testable, while real proofs, WLD transfers, tenant setup and secret storage are all blocked.
+
 ## Deployment guardrails
 
 - TLS, a durable PostgreSQL store, request-size limits, per-IP/project rate limits and structured audit logs are mandatory before public traffic.
