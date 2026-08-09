@@ -57,7 +57,7 @@ The public client contract is in [docs/API.md](docs/API.md); the current private
 
 ### TrueNAS demo
 
-`deploy/truenas-demo.yaml` installs the published `demo-latest` image through **Apps → Discover → Install via YAML**. It uses only port `31056` and starts with `DEMO_MODE=true`: onboarding and support UI are testable, while real proofs, WLD transfers, tenant setup and secret storage are all blocked.
+`deploy/truenas-demo.yaml` installs a public, 24-hour demo image through **Apps → Discover → Install via YAML**. It uses only port `31056` and starts with `DEMO_MODE=true`: onboarding and support UI are testable, while real proofs, WLD transfers, tenant setup and secret storage are all blocked. Production images remain in GHCR and require registry credentials.
 
 ## Deployment guardrails
 

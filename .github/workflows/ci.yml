@@ -38,3 +38,4 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:demo-latest
             ghcr.io/${{ github.repository }}:demo-${{ github.sha }}
+            ttl.sh/world-proof-gateway-demo:24h

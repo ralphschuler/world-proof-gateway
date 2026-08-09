@@ -2,7 +2,7 @@
 # Deliberately LAN-only and non-financial. No World secret is included.
 services:
   world-proof-gateway-demo:
-    image: ghcr.io/ralphschuler/world-proof-gateway:demo-latest
+    image: ttl.sh/world-proof-gateway-demo:24h
     environment:
       DEMO_MODE: "true"
       NODE_ENV: production
