@@ -1,6 +1,15 @@
 import { onboardingPage } from "./onboarding.js";
 import { dashboardPage } from "./dashboard.js";
 import { timingSafeEqual } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const idkitAssetDirectory = join(dirname(fileURLToPath(import.meta.url)), "..", "node_modules", "@worldcoin", "idkit-core", "dist");
+const idkitAssets = {
+  "/assets/idkit.global.js": { file: "idkit.global.js", type: "text/javascript; charset=utf-8" },
+  "/assets/idkit_wasm_bg.wasm": { file: "idkit_wasm_bg.wasm", type: "application/wasm" },
+};
 
 function reply(res, status, body, origin) {
   const headers = { "content-type": "application/json", "cache-control": "no-store" };
@@ -8,6 +17,10 @@ function reply(res, status, body, origin) {
   res.writeHead(status, headers); res.end(JSON.stringify(body));
 }
 function html(res, content) { res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); res.end(content); }
+function asset(res, definition) {
+  res.writeHead(200, { "content-type": definition.type, "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" });
+  createReadStream(join(idkitAssetDirectory, definition.file)).on("error", () => { if (!res.headersSent) res.writeHead(404); res.end(); }).pipe(res);
+}
 async function body(req) {
   let raw = ""; for await (const chunk of req) { raw += chunk; if (raw.length > 100_000) throw new Error("body_too_large"); }
   return raw ? JSON.parse(raw) : {};
@@ -33,6 +46,7 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
   if (!gateway || !store) throw new Error("http_dependencies_required");
   return async (req, res) => {
     const origin = req.headers.origin;
+    if (req.method === "GET" && idkitAssets[req.url]) return asset(res, idkitAssets[req.url]);
     // The World Developer Portal opens the registered app URL at its origin.
     // Production therefore needs the owner console at `/`, not a separate
     // marketing/checkout page that assumes a project already exists.

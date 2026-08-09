@@ -20,6 +20,12 @@ test("demo mode serves labeled onboarding and a healthy non-verifying path", asy
     const page = await fetch(`${base}/`);
     assert.equal(page.status, 200);
     assert.match(await page.text(), /DEMO — no real proof verification or crediting/);
+    const idkit = await fetch(`${base}/assets/idkit.global.js`);
+    assert.equal(idkit.status, 200);
+    assert.match(idkit.headers.get("content-type"), /text\/javascript/);
+    const wasm = await fetch(`${base}/assets/idkit_wasm_bg.wasm`);
+    assert.equal(wasm.status, 200);
+    assert.match(wasm.headers.get("content-type"), /application\/wasm/);
     const health = await (await fetch(`${base}/healthz`)).json();
     assert.deepEqual(health, { ok: true, mode: "demo" });
     const blocked = await (await fetch(`${base}/v1/projects/demo/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).json();
