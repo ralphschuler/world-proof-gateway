@@ -16,7 +16,7 @@ if (!demoMode && !process.env.GATEWAY_ADMIN_TOKEN) throw new Error("production_r
 const store = !demoMode && process.env.DATABASE_URL ? new PostgresProofStore(process.env.DATABASE_URL) : new MemoryProofStore();
 const tenantRegistry = !demoMode ? new PostgresTenantRegistry(process.env.DATABASE_URL, createTenantKeyVault(process.env.GATEWAY_TENANT_ENCRYPTION_KEY)) : null;
 const projects = tenantRegistry || new Map();
-const gateway = createGateway({ projects, store, attestationKey: process.env.GATEWAY_ATTESTATION_KEY });
+const gateway = createGateway({ projects, store, attestationKey: process.env.GATEWAY_ATTESTATION_KEY, enforceRequestCredits: !demoMode });
 const billing = createBillingService({
   store,
   receiverAddress: process.env.WLD_RECEIVER_ADDRESS,

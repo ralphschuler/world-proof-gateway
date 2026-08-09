@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createBillingService, WLD_REQUEST_PACK } from "../src/billing.js";
 import { MemoryProofStore } from "../src/store.js";
+import { createGateway } from "../src/gateway.js";
 
 const receiver = "0x1111111111111111111111111111111111111111";
 const appId = "app_gateway";
@@ -37,4 +38,14 @@ test("billing rejects a payment that does not exactly match the order", async ()
   const confirmation = await billing.confirmPayment({ reference: intent.body.reference, transactionId: "tx_234" });
   assert.equal(confirmation.status, 422);
   assert.deepEqual(confirmation.body, { error: "world_payment_mismatch" });
+});
+
+test("a credited project can create exactly its purchased number of proof requests", async () => {
+  const store = new MemoryProofStore();
+  await store.createBillingOrder({ reference: "wpg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", projectId: "idle-mint", requestCredits: 1, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+  await store.creditBillingOrder({ reference: "wpg_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", transactionId: "tx_credit", transactionHash: "0xcredit" });
+  const projects = new Map([["idle-mint", { id: "idle-mint", appId: appId, rpId: "rp_gateway", action: "gateway-owner-login-v1", environment: "production", signingKey: `0x${"11".repeat(32)}`, allowedOrigins: ["https://example.test"], signalPolicy: "none" }]]);
+  const gateway = createGateway({ projects, store, enforceRequestCredits: true });
+  assert.equal((await gateway.proofContext("idle-mint", { action: "gateway-owner-login-v1" }, "https://example.test")).status, 200);
+  assert.equal((await gateway.proofContext("idle-mint", { action: "gateway-owner-login-v1" }, "https://example.test")).status, 402);
 });

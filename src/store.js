@@ -36,4 +36,11 @@ export class MemoryProofStore {
     this.#credits.set(order.projectId, remainingRequests);
     return { remainingRequests };
   }
+  async consumeProjectRequestCredit(projectId) {
+    const remaining = this.#credits.get(projectId) || 0;
+    if (remaining <= 0) return null;
+    this.#credits.set(projectId, remaining - 1);
+    return { remainingRequests: remaining - 1 };
+  }
+  async restoreProjectRequestCredit(projectId) { this.#credits.set(projectId, (this.#credits.get(projectId) || 0) + 1); }
 }

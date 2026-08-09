@@ -12,7 +12,7 @@ function normalizeHex(value) {
 function json(status, body) { return { status, body }; }
 function responseSignal(response) { return response?.responses?.[0]?.signal_hash; }
 
-export function createGateway({ projects, store, fetchImpl = globalThis.fetch, attestationKey, now = () => Date.now() }) {
+export function createGateway({ projects, store, fetchImpl = globalThis.fetch, attestationKey, now = () => Date.now(), enforceRequestCredits = false }) {
   if (!projects || !store || typeof fetchImpl !== "function") throw new Error("gateway_dependencies_required");
   const signer = attestationKey ? privateKeyToAccount(attestationKey) : null;
   async function projectFor(projectId) { return projects.get(projectId); }
@@ -25,9 +25,11 @@ export function createGateway({ projects, store, fetchImpl = globalThis.fetch, a
     if (action !== project.action) return json(400, { error: "action_not_allowed" });
     if (project.signalPolicy === "wallet-address" && (!wallet.test(signal || ""))) return json(400, { error: "wallet_signal_required" });
     if (project.signalPolicy === "none" && signal !== undefined) return json(400, { error: "signal_not_allowed" });
+    if (enforceRequestCredits && !await store.consumeProjectRequestCredit(projectId)) return json(402, { error: "request_credits_exhausted", message: "Buy a WLD request pack to continue." });
     const sig = signRequest({ action: project.action, signingKeyHex: project.signingKey });
     const signalHash = signal ? hashSignal(signal.toLowerCase()) : zeroHash;
-    await store.saveContext({ nonce: sig.nonce, projectId, action, signalHash: normalizeHex(signalHash), subject: signal?.toLowerCase() || null, expiresAt: Number(sig.expiresAt) * 1000, consumed: false });
+    try { await store.saveContext({ nonce: sig.nonce, projectId, action, signalHash: normalizeHex(signalHash), subject: signal?.toLowerCase() || null, expiresAt: Number(sig.expiresAt) * 1000, consumed: false }); }
+    catch (error) { if (enforceRequestCredits) await store.restoreProjectRequestCredit?.(projectId); throw error; }
     return json(200, { app_id: project.appId, action: project.action, environment: project.environment, rp_context: { rp_id: project.rpId, nonce: sig.nonce, created_at: sig.createdAt, expires_at: sig.expiresAt, signature: sig.sig } });
   }
 

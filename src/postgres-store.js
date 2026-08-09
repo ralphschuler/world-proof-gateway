@@ -51,6 +51,13 @@ export class PostgresProofStore {
       return { remainingRequests: credit.rows[0].remaining_requests };
     } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
   }
+  async consumeProjectRequestCredit(projectId) {
+    const result = await this.#pool.query("UPDATE project_request_credits SET remaining_requests = remaining_requests - 1, updated_at = NOW() WHERE project_id = $1 AND remaining_requests > 0 RETURNING remaining_requests", [projectId]);
+    return result.rowCount ? { remainingRequests: result.rows[0].remaining_requests } : null;
+  }
+  async restoreProjectRequestCredit(projectId) {
+    await this.#pool.query("UPDATE project_request_credits SET remaining_requests = remaining_requests + 1, updated_at = NOW() WHERE project_id = $1", [projectId]);
+  }
   async close() { await this.#pool.end(); }
   async health() { await this.#pool.query("SELECT 1"); return true; }
 }
