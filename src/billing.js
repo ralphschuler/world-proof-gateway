@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 export const WLD_REQUEST_PACK = Object.freeze({
   id: "wld-5000-requests-v1",
   currency: "WLD",
-  // MiniKit Pay receives a human-readable decimal amount. The Developer
-  // Portal transaction API returns the verified amount with six decimals.
-  payAmount: "1.0",
+  // MiniKit Pay receives the WLD 18-decimal amount; the Developer Portal
+  // transaction API returns the verified amount with six decimals.
+  payAmount: "1000000000000000000",
   priceAtomic: "1000000",
   displayPrice: "1 WLD",
   requestCredits: 5000,
