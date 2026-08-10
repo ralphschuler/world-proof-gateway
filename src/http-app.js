@@ -34,6 +34,11 @@ function validSupportRequest({ email, message } = {}) {
     && typeof message === "string" && message.trim().length > 0 && message.length <= 2000;
 }
 function secureRequest(req) { return req.socket.encrypted === true || req.headers["x-forwarded-proto"] === "https"; }
+function tenantCreateError(error) {
+  if (["invalid_tenant_id", "invalid_tenant_world_config", "invalid_tenant_environment", "invalid_tenant_origins", "invalid_tenant_signal_policy", "tenant_rp_signing_key_required"].includes(error?.message)) return error.message;
+  if (error?.code === "23505") return "tenant_identifier_already_exists";
+  return "tenant_create_failed";
+}
 function publicTenant(tenant) {
   const { rpSigningKey, signingKey, signing_key_envelope, ...safe } = tenant || {};
   return safe;
@@ -92,7 +97,7 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
       if (req.method === "GET") return reply(res, 200, { projects: (await tenantRegistry.listForOwner(owner)).map(publicTenant) });
       if (req.method === "POST") {
         if (!secureRequest(req)) return reply(res, 400, { error: "https_required" });
-        try { const tenant = await tenantRegistry.createForOwner(owner, await body(req)); return reply(res, 201, { tenant: publicTenant(tenant), portal_configuration_required: true }); } catch { return reply(res, 400, { error: "tenant_create_failed" }); }
+        try { const tenant = await tenantRegistry.createForOwner(owner, await body(req)); return reply(res, 201, { tenant: publicTenant(tenant), portal_configuration_required: true }); } catch (error) { return reply(res, 400, { error: tenantCreateError(error) }); }
       }
       return reply(res, 405, { error: "method_not_allowed" });
     }

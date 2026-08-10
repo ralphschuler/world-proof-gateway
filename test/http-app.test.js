@@ -40,7 +40,7 @@ test("a verified user owns their projects, browser bootstrap is unavailable, and
   const store = new MemoryProofStore();
   const ownerAuth = createOwnerAuth({ store, appId: "app_gateway", rpId: "rp_gateway", signingKey: `0x${"12".repeat(32)}`, sessionSecret: "test session secret with enough entropy", environment: "staging", fetchImpl: async () => new Response(JSON.stringify({ success: true, action: "gateway-owner-login-v1", environment: "staging", nullifier: "0x99" })) });
   const records = [];
-  const registry = { async listForOwner(id) { return records.filter((p) => p.owner === id).map(({ owner, ...p }) => p); }, async createForOwner(id, input) { const tenant = { ...input, owner: id, status: "active" }; records.push(tenant); return tenant; } };
+  const registry = { async listForOwner(id) { return records.filter((p) => p.owner === id).map(({ owner, ...p }) => p); }, async createForOwner(id, input) { if (input.id === "bad") throw new Error("invalid_tenant_id"); const tenant = { ...input, owner: id, status: "active" }; records.push(tenant); return tenant; } };
   const gateway = createGateway({ projects: new Map(), store });
   const server = createServer(createHttpHandler({ gateway, store, tenantRegistry: registry, ownerAuth }));
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -57,6 +57,8 @@ test("a verified user owns their projects, browser bootstrap is unavailable, and
     assert.equal((await fetch(`${base}/v1/admin/tenants`, { method: "POST" })).status, 404);
     const session = login.headers.get("set-cookie");
     assert.match(session, /HttpOnly; Secure; SameSite=Lax/);
+    const invalid = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json", "x-forwarded-proto": "https" }, body: JSON.stringify({ id: "bad" }) });
+    assert.deepEqual(await invalid.json(), { error: "invalid_tenant_id" });
     const insecureCreate = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json" }, body: "{}" });
     assert.deepEqual(await insecureCreate.json(), { error: "https_required" });
     const created = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json", "x-forwarded-proto": "https" }, body: JSON.stringify({ id: "owner-project", appId: "app_owner", rpId: "rp_owner", rpSigningKey: `0x${"34".repeat(32)}`, action: "owner-project-access", environment: "staging", allowedOrigins: ["https://example.test"], signalPolicy: "none" }) });
