@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 export const WLD_REQUEST_PACK = Object.freeze({
   id: "wld-5000-requests-v1",
   currency: "WLD",
-  // MiniKit's WLD token uses 18 decimals: tokenToDecimals(1, Tokens.WLD).
-  priceAtomic: "1000000000000000000",
+  // MiniKit Pay receives a human-readable decimal amount. The Developer
+  // Portal transaction API returns the verified amount with six decimals.
+  payAmount: "1.0",
+  priceAtomic: "1000000",
   displayPrice: "1 WLD",
   requestCredits: 5000,
 });
@@ -34,7 +36,7 @@ export function createBillingService({ store, receiverAddress, appId, developerA
     if (!/^[a-z0-9][a-z0-9-]{2,47}$/.test(projectId || "")) return { status: 400, body: { error: "invalid_project_id" } };
     const reference = `wpg_${randomUUID().replaceAll("-", "")}`;
     await store.createBillingOrder({ reference, projectId, priceAtomic: plan.priceAtomic, requestCredits: plan.requestCredits, expiresAt: new Date(now() + 15 * 60_000).toISOString() });
-    return { status: 201, body: { reference, project_id: projectId, to: receiverAddress, token: plan.currency, token_amount: plan.priceAtomic, description: "World Proof Gateway — 5,000 requests", expires_at: new Date(now() + 15 * 60_000).toISOString() } };
+    return { status: 201, body: { reference, project_id: projectId, to: receiverAddress, token: plan.currency, token_amount: plan.payAmount, description: "World Proof Gateway — 5,000 requests", expires_at: new Date(now() + 15 * 60_000).toISOString() } };
   }
   async function confirmPayment({ reference, transactionId } = {}) {
     if (!plan.charging_enabled) return { status: 503, body: { error: "billing_not_configured" } };

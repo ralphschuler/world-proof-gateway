@@ -8,8 +8,9 @@ const receiver = "0x1111111111111111111111111111111111111111";
 const appId = "app_gateway";
 const apiKey = "this-is-a-server-only-developer-api-key";
 
-test("the fixed WLD pack uses MiniKit's 18-decimal WLD amount", () => {
-  assert.equal(WLD_REQUEST_PACK.priceAtomic, "1000000000000000000");
+test("the fixed WLD pack separates MiniKit display amount from Portal verification units", () => {
+  assert.equal(WLD_REQUEST_PACK.payAmount, "1.0");
+  assert.equal(WLD_REQUEST_PACK.priceAtomic, "1000000");
 });
 
 test("one mined exact WLD payment credits exactly 5,000 requests once", async () => {
@@ -22,6 +23,7 @@ test("one mined exact WLD payment credits exactly 5,000 requests once", async ()
   });
   const intent = await billing.createIntent({ projectId: "idle-mint" });
   assert.equal(intent.status, 201);
+  assert.equal(intent.body.token_amount, "1.0");
   reference = intent.body.reference;
   const confirm = await billing.confirmPayment({ reference, transactionId: "tx_123" });
   assert.equal(confirm.status, 200);
