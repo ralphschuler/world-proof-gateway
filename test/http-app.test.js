@@ -61,13 +61,15 @@ test("a verified user owns their projects, browser bootstrap is unavailable, and
     assert.deepEqual(await invalid.json(), { error: "invalid_tenant_id" });
     const insecureCreate = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json" }, body: "{}" });
     assert.deepEqual(await insecureCreate.json(), { error: "https_required" });
+    const forwardedCreate = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json", forwarded: "for=192.0.2.1;proto=https" }, body: JSON.stringify({ id: "forwarded-project", appId: "app_forwarded", rpId: "rp_forwarded", rpSigningKey: `0x${"45".repeat(32)}`, action: "forwarded-access", environment: "staging", allowedOrigins: ["https://example.test"], signalPolicy: "none" }) });
+    assert.equal(forwardedCreate.status, 201);
     const created = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json", "x-forwarded-proto": "https" }, body: JSON.stringify({ id: "owner-project", appId: "app_owner", rpId: "rp_owner", rpSigningKey: `0x${"34".repeat(32)}`, action: "owner-project-access", environment: "staging", allowedOrigins: ["https://example.test"], signalPolicy: "none" }) });
     assert.equal(created.status, 201);
     const createdBody = await created.json();
     assert.equal(createdBody.rp_signing_key, undefined);
     assert.doesNotMatch(JSON.stringify(createdBody), /0x343434/);
     const listed = await (await fetch(`${base}/v1/owner/projects`, { headers: { cookie: session } })).json();
-    assert.equal(listed.projects.length, 1);
+    assert.equal(listed.projects.length, 2);
     assert.doesNotMatch(JSON.stringify(listed), /rpSigningKey|0x343434/);
   } finally { await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve())); }
 });
