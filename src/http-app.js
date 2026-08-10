@@ -1,6 +1,5 @@
 import { onboardingPage } from "./onboarding.js";
 import { dashboardPage } from "./dashboard.js";
-import { timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,11 +33,6 @@ function validSupportRequest({ email, message } = {}) {
   return typeof email === "string" && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
     && typeof message === "string" && message.trim().length > 0 && message.length <= 2000;
 }
-function authorized(req, token) {
-  const supplied = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
-  if (!token || !supplied || supplied.length !== token.length) return false;
-  return timingSafeEqual(Buffer.from(supplied), Buffer.from(token));
-}
 function secureRequest(req) { return req.socket.encrypted === true || req.headers["x-forwarded-proto"] === "https"; }
 function publicTenant(tenant) {
   const { rpSigningKey, signingKey, signing_key_envelope, ...safe } = tenant || {};
@@ -47,7 +41,7 @@ function publicTenant(tenant) {
 function cookie(req, name) { return req.headers.cookie?.split(/;\s*/).find((entry) => entry.startsWith(`${name}=`))?.slice(name.length + 1); }
 function ownerCookie(value) { return `wpg_owner_session=${value}; Path=/; Max-Age=28800; HttpOnly; Secure; SameSite=Lax`; }
 
-export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, adminToken = null, billing = null, ownerAuth = null }) {
+export function createHttpHandler({ gateway, store, demoMode = false, tenantRegistry = null, billing = null, ownerAuth = null }) {
   if (!gateway || !store) throw new Error("http_dependencies_required");
   return async (req, res) => {
     const origin = req.headers.origin;
@@ -80,13 +74,6 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
       if (demoMode || !billing) return reply(res, 503, { error: "billing_unavailable" }, origin);
       try { const result = await billing.confirmPayment(await body(req)); return reply(res, result.status, result.body, origin); }
       catch { return reply(res, 502, { error: "billing_confirmation_failed" }, origin); }
-    }
-    if (req.url === "/v1/admin/tenants") {
-      if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });
-      if (demoMode || !tenantRegistry) return reply(res, 503, { error: "tenant_admin_unavailable" });
-      if (!authorized(req, adminToken)) return reply(res, 401, { error: "unauthorized" });
-      try { return reply(res, 201, { tenant: await tenantRegistry.create(await body(req)) }); }
-      catch { return reply(res, 400, { error: "tenant_create_failed" }); }
     }
     if (req.url === "/v1/owner/proof-context") {
       if (req.method !== "POST") return reply(res, 405, { error: "method_not_allowed" });

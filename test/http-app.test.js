@@ -36,10 +36,9 @@ test("demo mode serves labeled onboarding and a healthy non-verifying path", asy
   });
 });
 
-test("a configured owner can log in, browser bootstrap is unavailable, and Portal-issued RP keys are never returned", async () => {
+test("a verified user owns their projects, browser bootstrap is unavailable, and Portal-issued RP keys are never returned", async () => {
   const store = new MemoryProofStore();
-  await store.enrollOwnerNullifier("153");
-  const ownerAuth = createOwnerAuth({ store, appId: "app_gateway", rpId: "rp_gateway", signingKey: `0x${"12".repeat(32)}`, sessionSecret: "test session secret with enough entropy", ownerNullifiers: ["153"], environment: "staging", fetchImpl: async () => new Response(JSON.stringify({ success: true, action: "gateway-owner-login-v1", environment: "staging", nullifier: "0x99" })) });
+  const ownerAuth = createOwnerAuth({ store, appId: "app_gateway", rpId: "rp_gateway", signingKey: `0x${"12".repeat(32)}`, sessionSecret: "test session secret with enough entropy", environment: "staging", fetchImpl: async () => new Response(JSON.stringify({ success: true, action: "gateway-owner-login-v1", environment: "staging", nullifier: "0x99" })) });
   const records = [];
   const registry = { async listForOwner(id) { return records.filter((p) => p.owner === id).map(({ owner, ...p }) => p); }, async createForOwner(id, input) { const tenant = { ...input, owner: id, status: "active" }; records.push(tenant); return tenant; } };
   const gateway = createGateway({ projects: new Map(), store });
@@ -49,12 +48,13 @@ test("a configured owner can log in, browser bootstrap is unavailable, and Porta
     const base = `http://127.0.0.1:${server.address().port}`;
     const root = await fetch(`${base}/`);
     assert.equal(root.status, 200);
-    assert.match(await root.text(), /Owner console/);
+    assert.match(await root.text(), /Developer console/);
     assert.equal((await fetch(`${base}/v1/owner/projects`)).status, 401);
     const context = await (await fetch(`${base}/v1/owner/proof-context`, { method: "POST" })).json();
     const login = await fetch(`${base}/v1/owner/proofs`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idkitResponse: { nonce: context.rp_context.nonce, action: context.action, environment: context.environment } }) });
     assert.equal(login.status, 200);
     assert.equal((await fetch(`${base}/v1/admin/owner/proof-context`, { method: "POST" })).status, 404);
+    assert.equal((await fetch(`${base}/v1/admin/tenants`, { method: "POST" })).status, 404);
     const session = login.headers.get("set-cookie");
     assert.match(session, /HttpOnly; Secure; SameSite=Lax/);
     const insecureCreate = await fetch(`${base}/v1/owner/projects`, { method: "POST", headers: { cookie: session, "content-type": "application/json" }, body: "{}" });

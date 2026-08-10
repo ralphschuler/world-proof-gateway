@@ -4,25 +4,8 @@ import { signRequest } from "@worldcoin/idkit-core/signing";
 function json(status, body) { return { status, body }; }
 function hex(value) { try { return BigInt(value).toString(10); } catch { return null; } }
 
-export function configuredOwnerNullifiers(value) {
-  if (!value) return [];
-  const nullifiers = new Set();
-  for (const item of String(value).split(",")) {
-    const nullifier = hex(item.trim());
-    if (!nullifier || BigInt(nullifier) <= 0n) throw new Error("invalid_gateway_owner_nullifier");
-    nullifiers.add(nullifier);
-  }
-  return [...nullifiers];
-}
-
-export async function enrollConfiguredOwners(store, value) {
-  const nullifiers = Array.isArray(value) ? value : configuredOwnerNullifiers(value);
-  for (const nullifier of nullifiers) await store.enrollOwnerNullifier(nullifier);
-}
-
-export function createOwnerAuth({ store, appId, rpId, signingKey, environment = "production", action = "gateway-owner-login-v1", sessionSecret, ownerNullifiers = [], fetchImpl = globalThis.fetch, now = () => Date.now() }) {
+export function createOwnerAuth({ store, appId, rpId, signingKey, environment = "production", action = "gateway-owner-login-v1", sessionSecret, fetchImpl = globalThis.fetch, now = () => Date.now() }) {
   if (!store || !/^app_[A-Za-z0-9]+$/.test(appId || "") || !/^rp_[A-Za-z0-9]+$/.test(rpId || "") || !signingKey || !sessionSecret) throw new Error("owner_auth_configuration_required");
-  const configuredOwners = new Set(ownerNullifiers);
   const mac = (value) => createHmac("sha256", sessionSecret).update(value).digest("base64url");
   const encode = (owner) => {
     const payload = Buffer.from(JSON.stringify({ owner, exp: Math.floor(now() / 1000) + 60 * 60 * 8 })).toString("base64url");
@@ -46,7 +29,7 @@ export function createOwnerAuth({ store, appId, rpId, signingKey, environment = 
     let verified; try { verified = await response.json(); } catch { return json(502, { error: "world_verify_invalid_response" }); }
     const nullifier = hex(verified?.nullifier);
     if (!response.ok || verified?.success !== true || verified.action !== action || verified.environment !== environment || !nullifier) return json(422, { error: "world_proof_rejected" });
-    if (!configuredOwners.has(nullifier) || !(await store.isOwnerEnrolled(nullifier))) return json(403, { error: "owner_not_enrolled" });
+    await store.enrollOwnerNullifier(nullifier);
     await store.recordOwnerLogin(nullifier);
     return json(200, { verified: true, session: encode(nullifier) });
   }

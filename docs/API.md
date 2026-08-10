@@ -1,16 +1,16 @@
 # Public integration API
 
-Base URL: `https://proof.example.com`. Each static Mini App owns a fixed project ID, configured by the SaaS operator after World Developer Portal registration.
+Base URL: `https://proof.example.com`. Each static Mini App owns a fixed project ID, configured by its verified developer after World Developer Portal registration.
 
 ## Private-beta browser and configuration endpoints
 
-## Owner dashboard API
+## Developer dashboard API
 
-`POST /v1/owner/proof-context` returns the signed context for the Gateway's own fixed World RP. Submit the unchanged IDKit result to `POST /v1/owner/proofs`; it sets a secure HttpOnly owner session cookie only for a previously enrolled nullifier. A verified but unbootstrapped person receives `403 owner_not_enrolled`.
+`POST /v1/owner/proof-context` returns the signed context for the Gateway's own fixed World RP. Submit the unchanged IDKit result to `POST /v1/owner/proofs`; it automatically creates or reuses a developer account keyed by the verified, scoped World ID nullifier and sets a secure HttpOnly session cookie.
 
-Enrollment is a separate, one-time operator action: call `POST /v1/admin/owner/proof-context` and submit its unchanged IDKit result to `POST /v1/admin/owner/proofs`. Both endpoints require `Authorization: Bearer $GATEWAY_ADMIN_TOKEN`; a duplicate enrollment returns `409 owner_already_enrolled`. Owner proof contexts are not project proof contexts and do not consume request credits.
+There is no global administrator enrollment or `/v1/admin/tenants` control plane. Login proof contexts are not project proof contexts and do not consume request credits.
 
-With that cookie, `GET /v1/owner/projects` lists only the owner's projects and HTTPS `POST /v1/owner/projects` creates one. Creation requires `rpSigningKey`, the 32-byte `0x...` key issued by the World Developer Portal for the configured RP. The Gateway encrypts it at rest and never returns it in create responses, project lists or the dashboard. The World Developer Portal App, RP and action must be configured manually first: no documented runtime API can register a Gateway-generated signing key, and this MVP does not claim automatic Portal provisioning.
+With that cookie, `GET /v1/owner/projects` lists only the developer's projects and HTTPS `POST /v1/owner/projects` creates one. Creation requires `rpSigningKey`, the 32-byte `0x...` key issued by the World Developer Portal for the configured RP. The Gateway encrypts it at rest and never returns it in create responses, project lists or the dashboard. The World Developer Portal App, RP and action must be configured manually first: no documented runtime API can register a Gateway-generated signing key, and this MVP does not claim automatic Portal provisioning.
 
 `GET /` is a mobile-first checkout surface. It is safe in a regular browser but MiniKit Pay only runs inside World App.
 
@@ -20,7 +20,7 @@ With that cookie, `GET /v1/owner/projects` lists only the owner's projects and H
 { "id": "wld-5000-requests-v1", "displayPrice": "1 WLD", "requestCredits": 5000 }
 ```
 
-`POST /v1/billing/intents` takes `{ "projectId": "example-project" }` and creates one 15-minute MiniKit Pay reference for the signed-in owner of that project. `POST /v1/billing/confirmations` takes `{ "reference": "wpg_<32-hex>", "transactionId": "tx_..." }`. The gateway queries the World Developer Portal and only credits 5,000 requests when the transaction is `mined` and the reference, app ID, World Chain, WLD amount and receiver match exactly. Duplicate confirmations are idempotent; browser-provided payment data can never grant credits.
+`POST /v1/billing/intents` takes `{ "projectId": "example-project" }` and creates one 15-minute MiniKit Pay reference for the signed-in developer who owns that project. `POST /v1/billing/confirmations` takes `{ "reference": "wpg_<32-hex>", "transactionId": "tx_..." }`. The gateway queries the World Developer Portal and only credits 5,000 requests when the transaction is `mined` and the reference, app ID, World Chain, WLD amount and receiver match exactly. Duplicate confirmations are idempotent; browser-provided payment data can never grant credits.
 
 `POST /v1/support-requests` accepts `{ "email": "...", "message": "..." }`. It is only persisted by the test/demo `MemoryProofStore`, where it is non-durable and erased on restart. A PostgreSQL-backed production service returns `503` for this endpoint until a durable support schema is explicitly reviewed and implemented.
 

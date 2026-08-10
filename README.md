@@ -13,9 +13,9 @@ The gateway signs the context server-side, sends the untouched proof to World, a
 
 `RP_SIGNING_KEY` is reserved for the Gateway's own World ID owner/authentication flow. It is not a tenant key and is never reused to sign tenant proofs. `GATEWAY_TENANT_ENCRYPTION_KEY` protects tenant RP keys at rest; `GATEWAY_ATTESTATION_KEY` is a separate optional EIP-712 signing key.
 
-## Owner dashboard MVP
+## Developer dashboard MVP
 
-`/dashboard` authenticates a Gateway owner with the Gateway's configured World App/RP (`GATEWAY_OWNER_APP_ID`, `GATEWAY_OWNER_RP_ID`, `RP_SIGNING_KEY`). Owner enrollment is server-only: put the allowed, comma-separated scoped World ID nullifiers in `GATEWAY_OWNER_NULLIFIERS` (decimal or `0x` notation). At startup the Gateway normalizes and stores those values; there is no browser bootstrap flow or owner-enrollment API. A valid World ID proof receives a session only when its verified nullifier is currently listed in that environment value; removing a value revokes new sessions after restart. The nullifier is neither a wallet address nor a private key. The server signs the owner RP context, directly verifies the untouched proof with World, and issues an eight-hour `HttpOnly; Secure; SameSite=Lax` session cookie signed with `GATEWAY_SESSION_SECRET`. Owner login contexts are separate from tenant proof contexts and never consume request credits.
+`/dashboard` authenticates a developer with the Gateway's fixed World App/RP (`GATEWAY_OWNER_APP_ID`, `GATEWAY_OWNER_RP_ID`, `RP_SIGNING_KEY`). After a valid World ID proof, the Gateway automatically creates or reuses the developer account represented by that scoped nullifier. There is no global admin enrollment, browser bootstrap flow or dynamic platform configuration endpoint. The nullifier is neither a wallet address nor a private key; it only scopes the developer's own projects. The server signs the login RP context, directly verifies the untouched proof with World, and issues an eight-hour `HttpOnly; Secure; SameSite=Lax` session cookie signed with `GATEWAY_SESSION_SECRET`. Login contexts are separate from tenant proof contexts and never consume request credits.
 
 An authenticated owner can create and list only their own projects. The owner must create the App, RP and action in the World Developer Portal and enter that Portal-issued RP signing key once in the HTTPS dashboard. The Gateway does not generate tenant signing keys: it encrypts the submitted key envelope at rest and never returns, lists or displays the key. Portal configuration is a manual prerequisite because no documented runtime API can register a Gateway-generated key.
 
@@ -27,9 +27,7 @@ For Mini Apps whose gameplay is fully on-chain, the gateway issues a short-lived
 # Put keys only in process secret environment. `RP_SIGNING_KEY` belongs to the
 # Gateway's own World RP; individual tenant keys are encrypted in PostgreSQL.
 export RP_SIGNING_KEY=0x...
-export GATEWAY_OWNER_NULLIFIERS=0x...,123...
 export GATEWAY_TENANT_ENCRYPTION_KEY=replace-with-32-byte-base64url-or-64-hex-key
-export GATEWAY_ADMIN_TOKEN=replace-with-long-random-token
 npm install
 npm test
 npm start
@@ -63,15 +61,12 @@ Demo mode identifies itself in both `/` and `/healthz`. Its health check succeed
 
 1. Copy `config/projects.example.json` to private `config/projects.json` and register each tenant's exact World app, RP, action and allowed origin.
 2. Put `POSTGRES_PASSWORD`, each tenant RP signing key, and (only for on-chain attestation tenants) `GATEWAY_ATTESTATION_KEY` in a secrets manager or deployment environment.
-3. Set `GATEWAY_OWNER_NULLIFIERS` to the scoped World ID nullifiers which may own the Gateway; it is not a wallet/private key list.
-4. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
-5. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
+3. Run `docker compose up -d --build` behind a TLS reverse proxy. The Compose port intentionally binds only to localhost.
+4. Monitor `GET /healthz`; it returns `503` if PostgreSQL is unavailable.
 
 ### Tenant provisioning
 
-The production control plane exposes `POST /v1/admin/tenants`, guarded by `Authorization: Bearer $GATEWAY_ADMIN_TOKEN`. It accepts a tenant's World configuration and `rpSigningKey`, stores only its encrypted envelope, and never returns the key. This endpoint is deliberately server-admin-only until Gateway owner authentication and audit logging are complete. Do not expose it directly to browsers.
-
-World Proof Gateway does not create or rotate tenant RP keys. The owner must create/configure each RP in the World Developer Portal and enter the Portal-issued key once through the HTTPS dashboard (or provide it to the admin control plane). No documented runtime API can register a Gateway-generated key. Both modes require one distinct Portal-issued RP key per tenant RP.
+World Proof Gateway does not create or rotate tenant RP keys. A verified developer creates/configures each RP in the World Developer Portal and enters the Portal-issued key once through the HTTPS dashboard. The key is encrypted at rest, is never returned, and each project is bound to the verified developer account that created it. No documented runtime API can register a Gateway-generated key.
 
 For a Custom App review/demo deployment, use the same container with `DEMO_MODE=true` and omit real World/database configuration. The page must remain visibly marked DEMO. This mode is only suitable for health checks and onboarding review, never for proof verification or asset crediting.
 
@@ -85,7 +80,7 @@ The installed demo also exposes an empty `RP_SIGNING_KEY` field in its TrueNAS A
 
 ### TrueNAS production bundle
 
-`deploy/truenas-production.yaml` runs the Gateway and its private PostgreSQL database as one Custom App. PostgreSQL has no host port; its named volume persists data. Before installing it, replace the placeholder values in TrueNAS's secret editor: database password, 32-byte tenant-encryption key, admin token and (only for Gateway's own World ID owner flow) `RP_SIGNING_KEY`. The image reference must point to a published, immutable production image; do not use the 24-hour demo image for real proofs.
+`deploy/truenas-production.yaml` runs the Gateway and its private PostgreSQL database as one Custom App. PostgreSQL has no host port; its named volume persists data. Before installing it, replace the placeholder values in TrueNAS's secret editor: database password, 32-byte tenant-encryption key and the Gateway's own World ID `RP_SIGNING_KEY`. The image reference must point to a published, immutable production image; do not use the 24-hour demo image for real proofs.
 
 ## Deployment guardrails
 
