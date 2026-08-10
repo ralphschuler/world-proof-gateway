@@ -8,6 +8,10 @@ const receiver = "0x1111111111111111111111111111111111111111";
 const appId = "app_gateway";
 const apiKey = "this-is-a-server-only-developer-api-key";
 
+test("the fixed WLD pack uses MiniKit's 18-decimal WLD amount", () => {
+  assert.equal(WLD_REQUEST_PACK.priceAtomic, "1000000000000000000");
+});
+
 test("one mined exact WLD payment credits exactly 5,000 requests once", async () => {
   const store = new MemoryProofStore();
   let requested;

@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 export const WLD_REQUEST_PACK = Object.freeze({
   id: "wld-5000-requests-v1",
   currency: "WLD",
-  priceAtomic: "1000000", // World MiniKit's WLD payment unit uses six decimals.
+  // MiniKit's WLD token uses 18 decimals: tokenToDecimals(1, Tokens.WLD).
+  priceAtomic: "1000000000000000000",
   displayPrice: "1 WLD",
   requestCredits: 5000,
 });
