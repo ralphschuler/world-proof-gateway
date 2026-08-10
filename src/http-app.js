@@ -57,7 +57,7 @@ export function createHttpHandler({ gateway, store, demoMode = false, tenantRegi
   return async (req, res) => {
     const origin = req.headers.origin;
     if (req.method === "GET" && idkitAssets[req.url]) return asset(res, idkitAssets[req.url]);
-    if (req.method === "GET" && req.url === "/assets/minikit.js") return browserAsset(res, "minikit.js");
+    if (req.method === "GET" && req.url?.split("?")[0] === "/assets/minikit.js") return browserAsset(res, "minikit.js");
     // The World Developer Portal opens the registered app URL at its origin.
     // Production therefore needs the owner console at `/`, not a separate
     // marketing/checkout page that assumes a project already exists.

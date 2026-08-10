@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["node_modules/@worldcoin/minikit-js/build/index.js"],
+  entryPoints: ["src/minikit-browser-entry.js"],
   outfile: "src/static/minikit.js",
   bundle: true,
   format: "esm",
